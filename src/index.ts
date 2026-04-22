@@ -17,3 +17,6 @@ export type {
   WorkspaceMarkdown,
   KnownMarkdownFile,
 } from './openclaw/workspace.js';
+
+export { extractOpenclawSummary } from './openclaw/extract.js';
+export type { OpenclawAgentSummary, ThinkingLevel } from './openclaw/extract.js';
