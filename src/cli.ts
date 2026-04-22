@@ -6,7 +6,12 @@
 // interactive prompts → graft.json emission).
 
 import { Command } from 'commander';
-import { VERSION } from './index.js';
+import {
+  VERSION,
+  readOpenclawWorkspace,
+  WorkspaceNotFoundError,
+  InvalidOpenclawConfigError,
+} from './index.js';
 
 const program = new Command();
 
@@ -22,11 +27,25 @@ program
     '-w, --workspace <path>',
     'Path to the agent workspace to inspect. Defaults to the current working directory.',
   )
-  .action((opts: { workspace?: string }) => {
+  .action(async (opts: { workspace?: string }) => {
     const target = opts.workspace ?? process.cwd();
-    // Placeholder until the real workspace inspector lands. Keep the
-    // message stable — tests assert on it as a smoke check.
-    console.log(`graft init: workspace introspection not implemented yet (target: ${target})`);
+    try {
+      const ws = await readOpenclawWorkspace(target);
+      const mdFiles = Object.keys(ws.markdown).sort();
+      const configKeys =
+        ws.config && typeof ws.config === 'object' ? Object.keys(ws.config as Record<string, unknown>) : [];
+      console.log(`Found OpenClaw workspace at ${ws.workspacePath}`);
+      console.log(`  config:   ${ws.configPath} (${configKeys.length} top-level keys)`);
+      console.log(`  markdown: ${mdFiles.length ? mdFiles.join(', ') : '(none)'}`);
+      console.log('');
+      console.log('graft.json generation is not implemented yet — coming in the next iteration.');
+    } catch (err) {
+      if (err instanceof WorkspaceNotFoundError || err instanceof InvalidOpenclawConfigError) {
+        console.error(`graft init: ${err.message}`);
+        process.exit(1);
+      }
+      throw err;
+    }
   });
 
 // `commander` writes help to stderr when no command is given. Keep that

@@ -1,8 +1,19 @@
 // Programmatic entry point for @guayaba/graft-cli.
 //
-// This is intentionally tiny right now: it only re-exports the package
-// version so consumers (and the CLI itself) have a single source of truth.
-// Workspace parsers, prompt definitions and the GRAFT builder will be
-// added here as separate exports in the next iterations.
+// Anything that's safe to call from another tool (no prompts, no
+// process.exit, no console output beyond what the caller asks for)
+// belongs here. Right now we expose the package version and the
+// OpenClaw workspace reader.
 
 export const VERSION = '0.0.1';
+
+export {
+  readOpenclawWorkspace,
+  WorkspaceNotFoundError,
+  InvalidOpenclawConfigError,
+} from './openclaw/workspace.js';
+export type {
+  OpenclawWorkspace,
+  WorkspaceMarkdown,
+  KnownMarkdownFile,
+} from './openclaw/workspace.js';
