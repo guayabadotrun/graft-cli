@@ -20,3 +20,6 @@ export type {
 
 export { extractOpenclawSummary } from './openclaw/extract.js';
 export type { OpenclawAgentSummary, ThinkingLevel } from './openclaw/extract.js';
+
+export { buildGraftFromOpenclaw } from './graft/build.js';
+export type { GraftDocument, GraftDefaults, GraftField } from './graft/build.js';
