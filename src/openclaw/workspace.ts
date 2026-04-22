@@ -23,8 +23,11 @@ const KNOWN_MARKDOWN_FILES = [
 
 export type KnownMarkdownFile = (typeof KNOWN_MARKDOWN_FILES)[number];
 
+/** Lower-case basename without the `.md` suffix — the keys used in {@link WorkspaceMarkdown}. */
+export type MarkdownKey = Lowercase<KnownMarkdownFile> extends `${infer K}.md` ? K : never;
+
 /** Lower-case keys without the `.md` suffix, easier to consume. */
-export type WorkspaceMarkdown = Partial<Record<Lowercase<KnownMarkdownFile> extends `${infer K}.md` ? K : never, string>>;
+export type WorkspaceMarkdown = Partial<Record<MarkdownKey, string>>;
 
 export interface OpenclawWorkspace {
   /** Absolute path to the workspace root the user pointed us at. */

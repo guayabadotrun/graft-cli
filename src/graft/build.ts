@@ -36,10 +36,13 @@ export interface GraftDocument {
 }
 
 export interface GraftDefaults {
+  bio?: string[];
+  knowledge?: string[];
   channels?: string[];
   settings?: {
     model?: string;
     thinking?: ThinkingLevel;
+    extra_instructions?: string;
   };
 }
 

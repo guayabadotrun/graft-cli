@@ -13,9 +13,14 @@ import {
   readOpenclawWorkspace,
   extractOpenclawSummary,
   buildGraftFromOpenclaw,
+  collectMarkdownDecisions,
+  mergeDecisionsIntoGraft,
+  defaultMetadataFor,
   WorkspaceNotFoundError,
   InvalidOpenclawConfigError,
 } from './index.js';
+import type { GraftMetadata, GraftPackage } from './graft/package.js';
+import { createClackPrompter } from './prompts/clack.js';
 
 const program = new Command();
 
@@ -36,13 +41,38 @@ program
     'Where to write the generated GRAFT document. Defaults to ./graft.json in the current directory.',
   )
   .option('-f, --force', 'Overwrite the output file if it already exists.', false)
-  .action(async (opts: { workspace?: string; out?: string; force?: boolean }) => {
+  .option(
+    '--no-interactive',
+    'Skip the markdown prompts and emit the structural baseline only. Auto-enabled when stdin is not a TTY.',
+  )
+  .action(async (opts: { workspace?: string; out?: string; force?: boolean; interactive?: boolean }) => {
     const target = opts.workspace ?? process.cwd();
     const outPath = resolve(opts.out ?? 'graft.json');
+    // commander turns `--no-interactive` into `interactive: false`. Auto-disable
+    // prompts when stdin isn't a TTY so the CLI is safe in CI / scripts.
+    const interactive = opts.interactive !== false && Boolean(process.stdin.isTTY);
     try {
       const ws = await readOpenclawWorkspace(target);
       const summary = extractOpenclawSummary(ws);
-      const doc = buildGraftFromOpenclaw(summary);
+      let doc = buildGraftFromOpenclaw(summary);
+      let metadata: GraftMetadata = defaultMetadataFor(summary);
+
+      if (interactive) {
+        const prompter = createClackPrompter();
+        const meta = await prompter.askMetadata(metadata);
+        if (meta === null) {
+          console.error('graft init: cancelled by user. No file written.');
+          process.exit(1);
+        }
+        metadata = meta;
+
+        const { decisions, cancelled } = await collectMarkdownDecisions(summary, prompter);
+        if (cancelled) {
+          console.error('graft init: cancelled by user. No file written.');
+          process.exit(1);
+        }
+        doc = mergeDecisionsIntoGraft(doc, decisions);
+      }
 
       if (!opts.force) {
         const exists = await access(outPath).then(
@@ -57,7 +87,8 @@ program
         }
       }
 
-      await writeFile(outPath, `${JSON.stringify(doc, null, 2)}\n`, 'utf8');
+      const pkg: GraftPackage = { metadata, schema: doc };
+      await writeFile(outPath, `${JSON.stringify(pkg, null, 2)}\n`, 'utf8');
 
       console.log(`Found OpenClaw workspace at ${ws.workspacePath}`);
       if (summary.agent.name) {
@@ -74,8 +105,12 @@ program
       }
       console.log('');
       console.log(`Wrote ${outPath}`);
-      console.log('Bio / knowledge / extra_instructions are NOT included — they live in agent-evolved markdown.');
-      console.log('Add them by hand or wait for the interactive prompts step.');
+      console.log(`  slug:    ${metadata.slug || '(not set)'}`);
+      console.log(`  version: ${metadata.version}`);
+      if (!interactive) {
+        console.log('Non-interactive mode: metadata is a placeholder; bio / knowledge / extra_instructions were not added.');
+        console.log('Re-run in a TTY (or omit --no-interactive) to fill metadata and review markdown.');
+      }
     } catch (err) {
       if (err instanceof WorkspaceNotFoundError || err instanceof InvalidOpenclawConfigError) {
         console.error(`graft init: ${err.message}`);
