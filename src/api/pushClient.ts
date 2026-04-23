@@ -1,9 +1,9 @@
-// HTTP client for `POST /api/v1/grafts/drafts` and
-// `PUT /api/v1/grafts/drafts/{slug}/assets/{type}` — pushes a complete,
+// HTTP client for `POST /api/v1/grafts` and
+// `PUT /api/v1/grafts/{slug}/assets/{type}` — pushes a complete,
 // versioned GRAFT bundle (built locally from a workspace) and its optional
 // icon / cover artwork to the author's personal area on the Guayaba backend.
 //
-// Wire format for the draft endpoint: `multipart/form-data` with three
+// Wire format for the grafts endpoint: `multipart/form-data` with three
 // fields — `bundle` (the tar.gz produced by `buildGraftBundle`), `metadata`
 // (JSON string) and `schema` (JSON string). The backend treats `bundle` as
 // opaque bytes; metadata + schema are validated server-side by the same
@@ -148,7 +148,7 @@ async function uploadAsset(
   const form = new FormData();
   form.append('file', new Blob([bytes], { type: mimeFor(filename) }), filename);
 
-  const url = joinUrl(`/grafts/drafts/${encodeURIComponent(slug)}/assets/${type}`);
+  const url = joinUrl(`/grafts/${encodeURIComponent(slug)}/assets/${type}`);
 
   let response: Response;
   try {
@@ -263,7 +263,7 @@ export async function pushGraftPackage(
     );
   }
 
-  const url = joinUrl('/grafts/drafts');
+  const url = joinUrl('/grafts');
   const form = new FormData();
   form.append('metadata', JSON.stringify(pkg.metadata));
   form.append('schema', JSON.stringify(pkg.schema));

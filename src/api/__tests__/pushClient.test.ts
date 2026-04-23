@@ -10,7 +10,7 @@ import {
 import type { GraftPackage } from '../../graft/package.js';
 import type { BuildGraftBundleInput, BuildGraftBundleResult } from '../../graft/bundle.js';
 
-const DRAFT_URL = 'https://api.guayaba.run/api/v1/grafts/drafts';
+const PUSH_URL = 'https://api.guayaba.run/api/v1/grafts';
 const FAKE_BUNDLE_BYTES = Buffer.from('fake-tar-gz-bytes');
 
 function pkg(): GraftPackage {
@@ -64,7 +64,7 @@ function jsonResponse(status: number, body: unknown): Response {
 }
 
 describe('pushGraftPackage — bundle only', () => {
-  it('POSTs multipart bundle to the v1 drafts endpoint and returns 201 data', async () => {
+  it('POSTs multipart bundle to the v1 grafts endpoint and returns 201 data', async () => {
     const { fetchImpl, spy } = mockFetch(() =>
       jsonResponse(201, {
         data: {
@@ -92,7 +92,7 @@ describe('pushGraftPackage — bundle only', () => {
     expect(result.assets).toEqual([]);
 
     const [url, init] = spy.mock.calls[0]!;
-    expect(url).toBe(DRAFT_URL);
+    expect(url).toBe(PUSH_URL);
     const reqInit = init as RequestInit;
     expect(reqInit.method).toBe('POST');
     expect(reqInit.headers).toMatchObject({
@@ -256,9 +256,9 @@ describe('pushGraftPackage — with assets', () => {
     // Bundle POST must be last — proves we don't build/upload the bundle
     // when assets fail.
     expect(calls).toEqual([
-      'https://api.guayaba.run/api/v1/grafts/drafts/my-graft/assets/icon',
-      'https://api.guayaba.run/api/v1/grafts/drafts/my-graft/assets/cover',
-      DRAFT_URL,
+      'https://api.guayaba.run/api/v1/grafts/my-graft/assets/icon',
+      'https://api.guayaba.run/api/v1/grafts/my-graft/assets/cover',
+      PUSH_URL,
     ]);
   });
 
@@ -286,7 +286,7 @@ describe('pushGraftPackage — with assets', () => {
     // Only the asset URL should have been hit and the bundle must not have
     // been built (expensive: spawns tar).
     expect(calls).toEqual([
-      'https://api.guayaba.run/api/v1/grafts/drafts/my-graft/assets/icon',
+      'https://api.guayaba.run/api/v1/grafts/my-graft/assets/icon',
     ]);
     expect(buildSpy).not.toHaveBeenCalled();
   });

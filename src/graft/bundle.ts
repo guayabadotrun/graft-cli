@@ -1,5 +1,5 @@
 // GRAFT bundle builder — assembles the full `.tar.gz` artefact that
-// gets POSTed to the backend (either via the public `/grafts/drafts`
+// gets POSTed to the backend (either via the public `/grafts`
 // endpoint with a master API key, or via the launcher's internal
 // equivalent with a launcher API key).
 //
