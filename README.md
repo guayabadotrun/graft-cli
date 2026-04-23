@@ -2,7 +2,7 @@
 
 CLI and programmatic toolkit to generate, validate, and publish **GRAFTs** (Guayaba Runtime Agent Framework Templates) from existing agent workspaces.
 
-A GRAFT is a reusable, declarative agent template — see the marketplace roadmap in `gene-seed/internal/roadmap/grafts-marketplace.md` for the full schema (`schema_version: 2`).
+A GRAFT is a reusable, declarative agent template that captures everything needed to reproduce an agent — its system prompt, skills, model settings, and metadata — so it can be shared and reinstalled from the Guayaba marketplace.
 
 ## Install
 
@@ -50,7 +50,7 @@ Options:
 
 Upload a `graft.json` (and optional artwork) to your **personal** storage on the Guayaba backend.
 
-Drafts pushed this way are private to your account — they aren't published to the public marketplace until you explicitly submit them for review (separate flow, not yet implemented).
+Drafts pushed this way are private to your account — they aren't published to the public marketplace until you explicitly submit them for review.
 
 ```
 Options:
@@ -62,21 +62,15 @@ Options:
 Authentication: requires an account **master** API key. Read from
 `$GUAYABA_API_KEY` or prompted in a TTY.
 
-Storage layout (server-side):
-
-```
-personal/{user_id}/{slug}/{version}/metadata.json
-personal/{user_id}/{slug}/{version}/schema.json
-personal/{user_id}/{slug}/icon.{png|jpg|webp}    ← unversioned, sweeps stale ext
-personal/{user_id}/{slug}/cover.{png|jpg|webp}   ← unversioned, sweeps stale ext
-```
-
-`(slug, version)` is **immutable**: re-pushing the same pair returns 409.
-Bump the `metadata.version` field to push again.
+> **Immutable versions:** pushing the same `(slug, version)` pair twice
+> returns `409 Conflict`. Bump `metadata.version` in your `graft.json` to
+> push a new revision.
 
 ### Validation
 
-`POST /api/v1/grafts/validate` is the **single source of truth** for "is this envelope authorable?". `--validate` and the manager UI's "Export GRAFT" modal both call into the same backend service (`GraftSchemaValidator`); the CLI does no client-side schema checks beyond JSON parseability.
+The `--validate` flag sends the envelope to the Guayaba API, which is the
+authoritative validator. The CLI performs no client-side schema checks beyond
+JSON parseability.
 
 ## Two modes
 
@@ -98,11 +92,11 @@ import {
 
 ## Authentication model
 
-The CLI talks to the **Public API v1 surface** (`https://api.guayaba.run/api/v1`), not the manager UI's Sanctum endpoints. That requires an account **master** API key (`g_master_*`) — slave / agent-scoped keys (`g_agent_*`) are rejected with 403.
+The CLI uses your account **master** API key to talk to the Guayaba Public API.
+Agent-scoped keys are rejected with `403`.
 
-Generate a master key from the manager UI: *Account → API Keys → New master key*. The same key works for both `--validate` and `push`.
-
-See `gene-seed/internal/architecture/security.md` for the full auth model.
+Generate a master key from the manager UI: *Account → API Keys → New master key*.
+The same key works for both `--validate` and `push`.
 
 ## Development
 
