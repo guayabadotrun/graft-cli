@@ -1,13 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  defaultMetadataFor,
-  parseTagsInput,
-  slugify,
-  validateName,
-  validateShortDescription,
-  validateSlug,
-  validateVersion,
-} from '../metadata.js';
+import { defaultMetadataFor, parseTagsInput, slugify } from '../metadata.js';
 import type { OpenclawAgentSummary } from '../../openclaw/extract.js';
 
 function summary(name: string | undefined): OpenclawAgentSummary {
@@ -39,61 +31,6 @@ describe('slugify', () => {
   it('truncates to 100 characters', () => {
     const long = 'a'.repeat(150);
     expect(slugify(long)).toHaveLength(100);
-  });
-});
-
-describe('validateSlug', () => {
-  it.each([
-    ['hello-world', undefined],
-    ['agent-1', undefined],
-    ['', 'Slug is required.'],
-    ['Hello-World', expect.stringContaining('kebab-case')],
-    ['hello_world', expect.stringContaining('kebab-case')],
-    ['-leading', expect.stringContaining('kebab-case')],
-    ['trailing-', expect.stringContaining('kebab-case')],
-    ['double--dash', expect.stringContaining('kebab-case')],
-    ['has space', expect.stringContaining('kebab-case')],
-  ])('validateSlug(%j) -> %j', (input, expected) => {
-    expect(validateSlug(input)).toEqual(expected);
-  });
-
-  it('rejects slugs longer than 100 chars', () => {
-    expect(validateSlug('a'.repeat(101))).toMatch(/100/);
-  });
-});
-
-describe('validateName', () => {
-  it('rejects blank names', () => {
-    expect(validateName('   ')).toMatch(/required/i);
-  });
-  it('accepts normal names', () => {
-    expect(validateName('Customer Support Pro')).toBeUndefined();
-  });
-  it('rejects names longer than 150 chars', () => {
-    expect(validateName('a'.repeat(151))).toMatch(/150/);
-  });
-});
-
-describe('validateShortDescription', () => {
-  it('accepts empty (it is optional)', () => {
-    expect(validateShortDescription('')).toBeUndefined();
-  });
-  it('rejects strings longer than 255 chars', () => {
-    expect(validateShortDescription('a'.repeat(256))).toMatch(/255/);
-  });
-});
-
-describe('validateVersion', () => {
-  it.each([
-    ['0.1.0', undefined],
-    ['1.0.0', undefined],
-    ['1.2.3-beta.1', undefined],
-    ['1.2.3+build.42', undefined],
-    ['v1.0.0', expect.stringContaining('semver')],
-    ['1.0', expect.stringContaining('semver')],
-    ['', expect.stringContaining('semver')],
-  ])('validateVersion(%j)', (input, expected) => {
-    expect(validateVersion(input)).toEqual(expected);
   });
 });
 

@@ -13,13 +13,13 @@ import type {
 } from './types.js';
 import type { GraftMetadata } from '../graft/package.js';
 import { KNOWN_CATEGORY_SLUGS } from '../graft/package.js';
-import {
-  parseTagsInput,
-  validateName,
-  validateShortDescription,
-  validateSlug,
-  validateVersion,
-} from '../graft/metadata.js';
+import { parseTagsInput } from '../graft/metadata.js';
+
+// Minimal "non-empty" guard for required free-text fields. Format checks
+// (slug regex, semver, length caps) are the backend's job — see
+// `graft init --validate <api-url>` and ValidateGraftRequest.
+const requireNonEmpty = (label: string) => (value: string): string | undefined =>
+  value.trim().length === 0 ? `${label} is required.` : undefined;
 
 const FILE_LABELS: Record<string, string> = {
   soul: 'SOUL.md',
@@ -58,21 +58,20 @@ export function createClackPrompter(): Prompter {
       const name = await text({
         message: 'GRAFT display name (max 150 chars).',
         initialValue: defaults.name,
-        validate: validateName,
+        validate: requireNonEmpty('Name'),
       });
       if (isCancel(name)) return null;
 
       const slug = await text({
         message: 'Slug (kebab-case, max 100 chars). Used in marketplace URLs.',
         initialValue: defaults.slug,
-        validate: validateSlug,
+        validate: requireNonEmpty('Slug'),
       });
       if (isCancel(slug)) return null;
 
       const shortDescription = await text({
         message: 'Short description (one-liner, max 255 chars). Leave blank to skip.',
         initialValue: defaults.short_description ?? '',
-        validate: (v: string) => (v.length === 0 ? undefined : validateShortDescription(v)),
       });
       if (isCancel(shortDescription)) return null;
 
@@ -85,7 +84,7 @@ export function createClackPrompter(): Prompter {
       const version = await text({
         message: 'Version (semver).',
         initialValue: defaults.version,
-        validate: validateVersion,
+        validate: requireNonEmpty('Version'),
       });
       if (isCancel(version)) return null;
 
