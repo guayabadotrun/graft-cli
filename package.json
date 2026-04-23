@@ -2,9 +2,11 @@
   "name": "@guayaba/graft-cli",
   "version": "0.0.1",
   "description": "CLI to generate Guayaba GRAFT templates from agent workspaces (OpenClaw and others).",
+  "author": "Bruno Lorente Cantarero <blorente@novadevs.com>",
+  "license": "MIT",
   "type": "module",
   "bin": {
-    "graft": "./dist/cli.js"
+    "graft": "dist/cli.js"
   },
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
@@ -18,6 +20,7 @@
   },
   "files": [
     "dist",
+    "!dist/*.map",
     "README.md",
     "LICENSE"
   ],

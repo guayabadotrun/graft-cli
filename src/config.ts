@@ -5,4 +5,4 @@
 //
 // Note: this points to the Public API v1 surface (master-key auth). The
 // Sanctum-protected `/api` endpoints are for the manager UI only.
-export const API_BASE_URL = 'https://api.guayaba.run/api/v1';
+export const API_BASE_URL = process.env.GUAYABA_API_BASE_URL ?? 'https://api.guayaba.run/api/v1';

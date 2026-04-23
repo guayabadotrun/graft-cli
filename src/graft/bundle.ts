@@ -112,6 +112,14 @@ export async function buildGraftBundle(
       'utf8',
     );
 
+    // GRAFT-contributed agent docs. These are top-level Markdown files
+    // (currently just TOOLS.md) that the launcher will inject as managed
+    // blocks into the corresponding agent-managed workspace file. They
+    // travel with the bundle so the GRAFT can ship environment-specific
+    // tool notes (CLIs, env vars, hosts…) alongside the skills that need
+    // them. Skipped silently when the workspace doesn't have the file.
+    await copyManagedDocsIntoBundle(workspacePath, stageDir);
+
     // Skills directory — only created if the workspace has any. An empty
     // `skills/` would round-trip fine but is noise on the wire.
     if (skills.length > 0) {
@@ -123,6 +131,7 @@ export async function buildGraftBundle(
       for (let i = 0; i < skills.length; i += 1) {
         const skill = skills[i];
         const manifest = skillManifests[i];
+        if (!skill || !manifest) continue;
         const tarPath = path.join(skillsDir, `${skill.name}.tar.gz`);
         const manifestPath = path.join(skillsDir, `${skill.name}.manifest.json`);
         await writeSkillTarball(skill.path, tarPath);
@@ -207,6 +216,34 @@ async function safeRemove(dir: string): Promise<void> {
 }
 
 /**
+ * Top-level Markdown files the GRAFT contributes to the agent's
+ * workspace. The launcher injects each one as a managed block into the
+ * corresponding agent-managed file at apply time, so the agent's own
+ * notes around the block survive across re-applies.
+ *
+ * Currently just `TOOLS.md` — the slot for environment-specific tool
+ * notes (CLIs, env vars, hosts) that travel with the GRAFT.
+ */
+const MANAGED_DOCS_IN_BUNDLE = ['TOOLS.md'] as const;
+
+async function copyManagedDocsIntoBundle(
+  workspacePath: string,
+  stageDir: string,
+): Promise<void> {
+  for (const filename of MANAGED_DOCS_IN_BUNDLE) {
+    const src = path.join(workspacePath, filename);
+    try {
+      const body = await fs.readFile(src, 'utf8');
+      await fs.writeFile(path.join(stageDir, filename), body, 'utf8');
+    } catch (err) {
+      const code = (err as NodeJS.ErrnoException).code;
+      if (code === 'ENOENT') continue;
+      throw err;
+    }
+  }
+}
+
+/**
  * Render the scaffold's `README.md`. This is the single doc the author
  * will see when they open the downloaded `.tar.gz` — it has to be enough
  * to get them from "I have a bundle" to "I pushed a working GRAFT".
@@ -231,6 +268,7 @@ ${slug}-${version}/
 ├── README.md              ← this file
 ├── metadata.json          ← marketplace-facing fields (name, slug, tags, …)
 ├── schema.json            ← agent definition + opt-in user inputs (\`fields[]\`)
+├── TOOLS.md               ← optional; injected into the agent's TOOLS.md
 └── skills/
     ├── <name>.tar.gz      ← raw skill folder (one per installed skill)
     └── <name>.manifest.json
@@ -279,6 +317,23 @@ can derive without guessing:
 
 Free-text variables (\`{{topic}}\`, \`{{tone}}\`, \`{{audience}}\` …) are **your job**
 — the export tool deliberately doesn't try to invent them from prose.
+
+## Optional: \`TOOLS.md\`
+
+If your source workspace has a top-level \`TOOLS.md\`, it ships with the bundle.
+On apply, the launcher injects it into the **new** agent's \`TOOLS.md\` as a
+managed block (delimited by \`<!-- BEGIN MANAGED:graft:tools -->\` /
+\`<!-- END MANAGED:graft:tools -->\`). The agent's notes outside that block are
+preserved across re-applies.
+
+Use it to ship environment-specific tool notes alongside your skills:
+
+- Which CLIs the GRAFT expects (\`gh\`, \`jq\`, \`yt-dlp\` …)
+- Which env vars / secrets back which command (\`gh\` reads \`$GITHUB_TOKEN\`)
+- Any host/account/path the skills assume
+
+Skip it (or delete it before re-packing) if you don't have anything to say —
+it's optional.
 
 ## Re-packing after edits
 

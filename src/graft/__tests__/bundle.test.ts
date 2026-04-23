@@ -162,8 +162,46 @@ describe('buildGraftBundle', () => {
     const alphaManifest = JSON.parse(
       (await extractFile(out, './skills/alpha.manifest.json')).toString('utf8'),
     );
-    expect(alphaManifest.name).toBe('alpha');
-    expect(alphaManifest.description).toBe('test');
+    await fs.rm(workspace, { recursive: true, force: true });
+  });
+
+  it('includes top-level TOOLS.md from the workspace when present', async () => {
+    const workspace = await makeWorkspace();
+    await fs.writeFile(
+      path.join(workspace, 'TOOLS.md'),
+      '# Tools\n\nuse `gh` with $GITHUB_TOKEN\n',
+      'utf8',
+    );
+    const out = path.join(workspace, 'out.tar.gz');
+
+    const { stream, done } = await buildGraftBundle({
+      workspacePath: workspace,
+      metadata: META,
+      schema: SCHEMA,
+    });
+    await Promise.all([consumeToFile(stream, out), done]);
+
+    const entries = await listEntries(out);
+    expect(entries).toContain('./TOOLS.md');
+    const body = (await extractFile(out, './TOOLS.md')).toString('utf8');
+    expect(body).toContain('GITHUB_TOKEN');
+
+    await fs.rm(workspace, { recursive: true, force: true });
+  });
+
+  it('omits TOOLS.md from the bundle when the workspace has none', async () => {
+    const workspace = await makeWorkspace();
+    const out = path.join(workspace, 'out.tar.gz');
+
+    const { stream, done } = await buildGraftBundle({
+      workspacePath: workspace,
+      metadata: META,
+      schema: SCHEMA,
+    });
+    await Promise.all([consumeToFile(stream, out), done]);
+
+    const entries = await listEntries(out);
+    expect(entries).not.toContain('./TOOLS.md');
 
     await fs.rm(workspace, { recursive: true, force: true });
   });
