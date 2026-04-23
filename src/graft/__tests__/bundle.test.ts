@@ -111,12 +111,20 @@ describe('buildGraftBundle', () => {
 
     expect(skillCount).toBe(0);
     const entries = await listEntries(out);
-    expect(entries.sort()).toEqual(['./metadata.json', './schema.json']);
+    expect(entries.sort()).toEqual(['./README.md', './metadata.json', './schema.json']);
 
     const metaJson = JSON.parse((await extractFile(out, './metadata.json')).toString('utf8'));
     expect(metaJson.slug).toBe('demo-graft');
     const schemaJson = JSON.parse((await extractFile(out, './schema.json')).toString('utf8'));
     expect(schemaJson.schema_version).toBe(2);
+
+    // The author-facing scaffold guide is shipped inside every bundle
+    // (see grafts-marketplace.md §3.6.2). Sanity-check it mentions the
+    // slug and the two key authoring instructions.
+    const readme = (await extractFile(out, './README.md')).toString('utf8');
+    expect(readme).toContain('demo-graft');
+    expect(readme).toContain('{{');
+    expect(readme).toContain('graft-cli push');
 
     await fs.rm(workspace, { recursive: true, force: true });
   });

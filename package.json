@@ -33,7 +33,8 @@
   },
   "dependencies": {
     "@clack/prompts": "^0.7.0",
-    "commander": "^12.1.0"
+    "commander": "^12.1.0",
+    "gray-matter": "^4.0.3"
   },
   "devDependencies": {
     "@types/node": "^20.12.0",

@@ -6,6 +6,7 @@
 // The on-the-wire layout is (frozen — see grafts-marketplace.md §0.4.5):
 //
 //   graft.tar.gz
+//   ├── README.md                   ← author-facing scaffold guide
 //   ├── metadata.json
 //   ├── schema.json
 //   └── skills/
@@ -38,6 +39,7 @@ import type { Readable } from 'node:stream';
 import { buildSkillManifest, listInstalledSkills, tarSkillBundle } from '../openclaw/skills.js';
 import type { GraftDocument } from './build.js';
 import type { GraftMetadata } from './package.js';
+import { augmentSchemaWithMechanicalFields, extractChannels } from './scaffoldFields.js';
 
 export interface BuildGraftBundleInput {
   /** Absolute path to the OpenClaw workspace root. */
@@ -76,6 +78,21 @@ export async function buildGraftBundle(
 
   let skillCount = 0;
   try {
+    // List skills up front: their manifests feed both the per-skill
+    // tarballs AND the mechanical `fields[]` derivation that augments
+    // the schema. Doing this once keeps everything consistent.
+    const { skills } = await listInstalledSkills(workspacePath);
+    const skillManifests = skills.map((s) => buildSkillManifest(s));
+
+    // Augment the schema with mechanical `fields[]` (skill secrets +
+    // channel secrets). Idempotent: if the caller already declared a
+    // field with the same id we leave it alone, so re-bundling an
+    // already-edited schema is a no-op for the derived part.
+    const augmentedSchema = augmentSchemaWithMechanicalFields(schema, {
+      skillManifests,
+      channels: extractChannels(schema),
+    });
+
     // Top-level documents.
     await fs.writeFile(
       path.join(stageDir, 'metadata.json'),
@@ -84,20 +101,28 @@ export async function buildGraftBundle(
     );
     await fs.writeFile(
       path.join(stageDir, 'schema.json'),
-      JSON.stringify(schema, null, 2),
+      JSON.stringify(augmentedSchema, null, 2),
+      'utf8',
+    );
+    // Author-facing guide. Lives in the bundle so the documentation
+    // travels with the artefact — see grafts-marketplace.md §3.6.2.
+    await fs.writeFile(
+      path.join(stageDir, 'README.md'),
+      renderScaffoldReadme(metadata),
       'utf8',
     );
 
     // Skills directory — only created if the workspace has any. An empty
     // `skills/` would round-trip fine but is noise on the wire.
-    const { skills } = await listInstalledSkills(workspacePath);
     if (skills.length > 0) {
       const skillsDir = path.join(stageDir, 'skills');
       await fs.mkdir(skillsDir);
 
       // Sequential to keep CPU/IO predictable and to avoid spawning N
       // tar children at once on workspaces with many skills.
-      for (const skill of skills) {
+      for (let i = 0; i < skills.length; i += 1) {
+        const skill = skills[i];
+        const manifest = skillManifests[i];
         const tarPath = path.join(skillsDir, `${skill.name}.tar.gz`);
         const manifestPath = path.join(skillsDir, `${skill.name}.manifest.json`);
         await writeSkillTarball(skill.path, tarPath);
@@ -105,7 +130,7 @@ export async function buildGraftBundle(
         // backend never needs to crack open the archive at apply time.
         await fs.writeFile(
           manifestPath,
-          JSON.stringify(buildSkillManifest(skill), null, 2),
+          JSON.stringify(manifest, null, 2),
           'utf8',
         );
         skillCount += 1;
@@ -179,4 +204,101 @@ async function safeRemove(dir: string): Promise<void> {
   } catch {
     // Best-effort cleanup; don't mask the original error.
   }
+}
+
+/**
+ * Render the scaffold's `README.md`. This is the single doc the author
+ * will see when they open the downloaded `.tar.gz` — it has to be enough
+ * to get them from "I have a bundle" to "I pushed a working GRAFT".
+ *
+ * Kept inline (vs. a separate template file) because it's short and
+ * because the only dynamic bit is the slug — anything more elaborate
+ * belongs in the marketplace docs, not in every author's tarball.
+ */
+function renderScaffoldReadme(metadata: GraftMetadata): string {
+  const slug = metadata.slug;
+  const version = metadata.version;
+  return `# ${metadata.name} — GRAFT scaffold
+
+This bundle is a **starting point** generated from a running agent. It contains
+everything needed to recreate that agent as a GRAFT, but with no \`{{variables}}\`
+yet — every default is the literal text the source agent had at export time.
+
+## What's inside
+
+\`\`\`
+${slug}-${version}/
+├── README.md              ← this file
+├── metadata.json          ← marketplace-facing fields (name, slug, tags, …)
+├── schema.json            ← agent definition + opt-in user inputs (\`fields[]\`)
+└── skills/
+    ├── <name>.tar.gz      ← raw skill folder (one per installed skill)
+    └── <name>.manifest.json
+\`\`\`
+
+You can push this bundle as-is — it will work. But the point of a GRAFT is to be
+*reusable across users*, which usually means turning some of the literal text in
+\`schema.json\` into \`{{placeholders}}\` the wizard asks the new owner to fill in.
+
+## Adding a user-input variable
+
+Two changes, both in \`schema.json\`:
+
+1. **Replace the literal value with \`{{your_variable_id}}\`** in \`defaults\`.
+   Example — turn the agent's hard-coded bio into a templated one:
+
+   \`\`\`diff
+     "defaults": {
+   -   "bio": "I help people debug Postgres queries."
+   +   "bio": "I help people debug {{topic}} queries."
+     }
+   \`\`\`
+
+2. **Declare the field** under \`fields[]\` so the wizard knows to ask for it:
+
+   \`\`\`json
+   {
+     "id": "topic",
+     "label": "What do you want help with?",
+     "type": "text",
+     "required": true,
+     "placeholder": "Postgres"
+   }
+   \`\`\`
+
+The full \`fields[]\` schema (types, validation, predicates, placement) lives in
+the GRAFT marketplace docs — search "schema_version 2" in the public API docs.
+
+## What's already templated for you
+
+This scaffold pre-fills \`fields[]\` with the **mechanical** entries the launcher
+can derive without guessing:
+
+- One \`secret\` field per skill that declares a \`primary_env\` in its manifest.
+- One \`secret\` field per channel that needs a token (e.g. Telegram).
+
+Free-text variables (\`{{topic}}\`, \`{{tone}}\`, \`{{audience}}\` …) are **your job**
+— the export tool deliberately doesn't try to invent them from prose.
+
+## Re-packing after edits
+
+\`\`\`bash
+cd ${slug}-${version}/
+tar -czf ../${slug}-${version}.tar.gz .
+\`\`\`
+
+(Run from inside the extracted folder so the tarball has the same flat layout.)
+
+## Pushing the edited bundle
+
+Until the "Upload bundle" UI ships, use the CLI:
+
+\`\`\`bash
+npx @guayaba/graft-cli push ./${slug}-${version}.tar.gz
+\`\`\`
+
+This calls \`POST /api/grafts\` with your master API key and creates (or
+versions) the personal GRAFT. The same \`(slug, version)\` is **immutable** —
+bump the version in \`metadata.json\` to push a new revision.
+`;
 }
