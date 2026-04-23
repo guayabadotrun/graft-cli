@@ -140,6 +140,8 @@ describe('buildGraftBundle', () => {
     expect(entries).toContain('./schema.json');
     expect(entries).toContain('./skills/alpha.tar.gz');
     expect(entries).toContain('./skills/beta.tar.gz');
+    expect(entries).toContain('./skills/alpha.manifest.json');
+    expect(entries).toContain('./skills/beta.manifest.json');
 
     // Sub-tarball is a real, valid tar.gz containing the skill dir.
     const alphaSubTar = path.join(workspace, 'alpha-extracted.tar.gz');
@@ -147,6 +149,13 @@ describe('buildGraftBundle', () => {
     const subEntries = await listEntries(alphaSubTar);
     expect(subEntries).toContain('alpha/SKILL.md');
     expect(subEntries).toContain('alpha/extra.txt');
+
+    // The companion manifest is a parsed projection of the SKILL.md.
+    const alphaManifest = JSON.parse(
+      (await extractFile(out, './skills/alpha.manifest.json')).toString('utf8'),
+    );
+    expect(alphaManifest.name).toBe('alpha');
+    expect(alphaManifest.description).toBe('test');
 
     await fs.rm(workspace, { recursive: true, force: true });
   });

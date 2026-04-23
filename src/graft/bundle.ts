@@ -3,23 +3,22 @@
 // endpoint with a master API key, or via the launcher's internal
 // equivalent with a launcher API key).
 //
-// The on-the-wire layout is:
+// The on-the-wire layout is (frozen — see grafts-marketplace.md §0.4.5):
 //
 //   graft.tar.gz
 //   ├── metadata.json
 //   ├── schema.json
 //   └── skills/
-//       ├── <name1>.tar.gz   ← each skill is a sub-tarball
-//       ├── <name2>.tar.gz
+//       ├── <name>.tar.gz             ← raw skill folder
+//       ├── <name>.manifest.json      ← parsed SKILL.md frontmatter, normalised
 //       └── ...
 //
-// Why nested tarballs instead of flattening every skill file at the top
-// level: the launcher of the *destination* agent will want to drop each
-// skill back into `<workspace>/skills/<name>/` atomically. Receiving them
-// pre-packaged means it can untar each one in the right place without
-// having to re-parse the tree to figure out boundaries between skills.
-// It also keeps `tarSkillBundle` (already shipped, already tested) as the
-// only place that knows how a single skill is packed.
+// `<name>.manifest.json` is REQUIRED for every `<name>.tar.gz`. The
+// backend persists it verbatim into `agent_skills.manifest` and never
+// opens the tar — this keeps the backend framework-agnostic and removes
+// PHP from the SKILL.md parsing chain entirely. Future framework
+// launchers (Paperclip, Hermes…) emit the same manifest shape; the
+// backend doesn't care.
 //
 // We deliberately don't include icon/cover here — those are unversioned
 // per gene-seed/internal/roadmap/grafts-marketplace.md §0.3 and are
@@ -36,7 +35,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import type { Readable } from 'node:stream';
 
-import { listInstalledSkills, tarSkillBundle } from '../openclaw/skills.js';
+import { buildSkillManifest, listInstalledSkills, tarSkillBundle } from '../openclaw/skills.js';
 import type { GraftDocument } from './build.js';
 import type { GraftMetadata } from './package.js';
 
@@ -99,8 +98,16 @@ export async function buildGraftBundle(
       // Sequential to keep CPU/IO predictable and to avoid spawning N
       // tar children at once on workspaces with many skills.
       for (const skill of skills) {
-        const outPath = path.join(skillsDir, `${skill.name}.tar.gz`);
-        await writeSkillTarball(skill.path, outPath);
+        const tarPath = path.join(skillsDir, `${skill.name}.tar.gz`);
+        const manifestPath = path.join(skillsDir, `${skill.name}.manifest.json`);
+        await writeSkillTarball(skill.path, tarPath);
+        // Per §0.4.5, the manifest is written next to the tar so the
+        // backend never needs to crack open the archive at apply time.
+        await fs.writeFile(
+          manifestPath,
+          JSON.stringify(buildSkillManifest(skill), null, 2),
+          'utf8',
+        );
         skillCount += 1;
       }
     }

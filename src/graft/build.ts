@@ -24,6 +24,19 @@
 import type { OpenclawAgentSummary, ThinkingLevel } from '../openclaw/extract.js';
 
 /**
+ * Channels that may appear in `defaults.channels[]` of a v2 GRAFT.
+ *
+ * Mirrors `GraftSchemaValidator::ALLOWED_GRAFT_CHANNELS` in the backend
+ * (convolution-api). `chat` is intentionally excluded — it's the always-on
+ * gateway transport, not a channel (see
+ * gene-seed/internal/roadmap/grafts-marketplace.md §0.4.1+§0.4.2). Adding a
+ * channel here MUST be paired with the launcher learning to wire it AND the
+ * matching PHP constant.
+ */
+export const ALLOWED_GRAFT_CHANNELS = ['telegram'] as const;
+export type AllowedGraftChannel = typeof ALLOWED_GRAFT_CHANNELS[number];
+
+/**
  * Minimal structural typing for what we emit. The marketplace spec
  * (gene-seed §2.1) allows arbitrary additional keys inside `defaults`
  * so we keep the shape open.
@@ -55,6 +68,16 @@ export function buildGraftFromOpenclaw(summary: OpenclawAgentSummary): GraftDocu
   const defaults: GraftDefaults = {};
 
   if (summary.universal.channels.length > 0) {
+    const unsupported = summary.universal.channels.filter(
+      (c) => !(ALLOWED_GRAFT_CHANNELS as readonly string[]).includes(c),
+    );
+    if (unsupported.length > 0) {
+      throw new Error(
+        `GRAFT defaults.channels contains unsupported channel(s): ${unsupported.join(', ')}. ` +
+          `Allowed: ${ALLOWED_GRAFT_CHANNELS.join(', ')}. ` +
+          `Note: 'chat' is not a channel — it is the always-on transport.`,
+      );
+    }
     defaults.channels = [...summary.universal.channels];
   }
 

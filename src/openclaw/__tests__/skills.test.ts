@@ -8,6 +8,7 @@ import {
   listInstalledSkills,
   resolveSkillDir,
   tarSkillBundle,
+  buildSkillManifest,
 } from '../skills.js';
 
 async function makeTempWorkspace(): Promise<string> {
@@ -28,27 +29,26 @@ async function writeSkill(
 }
 
 describe('parseSkillFrontmatter', () => {
-  it('parses minimal frontmatter', () => {
+  it('parses minimal frontmatter (name + description required)', () => {
     const r = parseSkillFrontmatter(`---\nname: hello\ndescription: hi\n---\nbody`);
     expect(r).toEqual({ name: 'hello', description: 'hi' });
   });
 
   it('parses metadata as inline JSON', () => {
     const r = parseSkillFrontmatter(
-      `---\nname: gemini\nmetadata: {"openclaw":{"emoji":"♊️","requires":{"bins":["gemini"]}}}\n---`,
+      `---\nname: gemini\ndescription: gem cli\nmetadata: {"openclaw":{"emoji":"♊️","requires":{"bins":["gemini"]}}}\n---`,
     );
     expect(r?.name).toBe('gemini');
     expect((r?.metadata as { openclaw: { emoji: string } }).openclaw.emoji).toBe('♊️');
   });
 
-  it('handles quoted strings, booleans, numbers', () => {
+  it('handles quoted strings, booleans', () => {
     const r = parseSkillFrontmatter(
-      `---\nname: "img_lab"\ndescription: 'image work'\nuser-invocable: false\nmaxMb: 10\n---`,
+      `---\nname: img_lab\ndescription: 'image work'\nuser-invocable: false\n---`,
     );
     expect(r?.name).toBe('img_lab');
     expect(r?.description).toBe('image work');
     expect(r?.['user-invocable']).toBe(false);
-    expect(r?.maxMb).toBe(10);
   });
 
   it('returns null when no frontmatter is present', () => {
@@ -64,12 +64,25 @@ describe('parseSkillFrontmatter', () => {
     expect(() => parseSkillFrontmatter('---\nname: x\ndescription: y')).toThrow(/closing/);
   });
 
-  it('throws on a line without colon', () => {
-    expect(() => parseSkillFrontmatter('---\nfoo bar\n---')).toThrow(/colon/);
-  });
-
   it('throws when name field is missing', () => {
     expect(() => parseSkillFrontmatter('---\ndescription: x\n---')).toThrow(/name/);
+  });
+
+  it('throws when description field is missing', () => {
+    expect(() => parseSkillFrontmatter('---\nname: x\n---')).toThrow(/description/);
+  });
+
+  it('throws on unknown top-level key', () => {
+    expect(() =>
+      parseSkillFrontmatter('---\nname: x\ndescription: y\nrandom: nope\n---'),
+    ).toThrow(/unknown key/);
+  });
+
+  it('throws on multi-line YAML block (single-line constraint)', () => {
+    // OpenClaw upstream parser only accepts single-line keys; we mirror that.
+    expect(() =>
+      parseSkillFrontmatter('---\nname: x\ndescription: |\n  multi\n  line\n---'),
+    ).toThrow(/single-line/);
   });
 });
 
@@ -91,8 +104,8 @@ describe('listInstalledSkills', () => {
   });
 
   it('discovers skills under both roots', async () => {
-    await writeSkill(workspace, 'skills', 'one', '---\nname: one\n---');
-    await writeSkill(workspace, '.agents/skills', 'two', '---\nname: two\n---');
+    await writeSkill(workspace, 'skills', 'one', '---\nname: one\ndescription: x\n---');
+    await writeSkill(workspace, '.agents/skills', 'two', '---\nname: two\ndescription: y\n---');
     const r = await listInstalledSkills(workspace);
     expect(r.skills.map((s) => s.name).sort()).toEqual(['one', 'two']);
     expect(r.errors).toEqual([]);
@@ -105,10 +118,14 @@ describe('listInstalledSkills', () => {
     expect(r.skills).toHaveLength(1);
     expect(r.skills[0]!.root).toBe('skills');
     expect(r.skills[0]!.description).toBe('high');
+    // The dropped duplicate is surfaced for the launcher to log.
+    expect(r.duplicates).toEqual([
+      { name: 'dup', winner: 'skills', loser: '.agents/skills' },
+    ]);
   });
 
   it('captures parse failures as non-fatal errors', async () => {
-    await writeSkill(workspace, 'skills', 'good', '---\nname: good\n---');
+    await writeSkill(workspace, 'skills', 'good', '---\nname: good\ndescription: ok\n---');
     const badDir = path.join(workspace, 'skills', 'bad');
     await fs.mkdir(badDir, { recursive: true });
     await fs.writeFile(path.join(badDir, 'SKILL.md'), 'no frontmatter here', 'utf8');
@@ -120,7 +137,7 @@ describe('listInstalledSkills', () => {
   });
 
   it('skips dotfiles and non-directories', async () => {
-    await writeSkill(workspace, 'skills', 'real', '---\nname: real\n---');
+    await writeSkill(workspace, 'skills', 'real', '---\nname: real\ndescription: y\n---');
     await fs.mkdir(path.join(workspace, 'skills', '.hidden'), { recursive: true });
     await fs.writeFile(path.join(workspace, 'skills', 'README'), 'not a skill', 'utf8');
     const r = await listInstalledSkills(workspace);
@@ -133,7 +150,7 @@ describe('listInstalledSkills', () => {
       workspace,
       'skills',
       'gem',
-      `---\nname: gem\nmetadata: {"openclaw":{"emoji":"♊️"}}\n---`,
+      `---\nname: gem\ndescription: gem cli\nmetadata: {"openclaw":{"emoji":"♊️"}}\n---`,
     );
     const r = await listInstalledSkills(workspace);
     expect(r.skills[0]!.emoji).toBe('♊️');
@@ -240,5 +257,62 @@ describe('tarSkillBundle', () => {
     // Drain stdout so the child process can finish.
     for await (const _ of stream) { /* drain */ }
     await expect(done).rejects.toThrow(/tar exited/);
+  });
+});
+
+describe('buildSkillManifest', () => {
+  it('produces a minimal manifest from name + description', () => {
+    const m = buildSkillManifest({
+      name: 'minimal',
+      path: '/x',
+      root: 'skills',
+      manifest: { name: 'minimal', description: 'just a skill' },
+    });
+    expect(m).toEqual({ name: 'minimal', description: 'just a skill' });
+  });
+
+  it('hoists emoji, requires, primary_env, install from metadata.openclaw', () => {
+    const m = buildSkillManifest({
+      name: 'gem',
+      path: '/x',
+      root: 'skills',
+      emoji: '♊',
+      manifest: {
+        name: 'gem',
+        description: 'gemini wrapper',
+        homepage: 'https://example.com',
+        metadata: {
+          openclaw: {
+            emoji: '♊',
+            requires: { bins: ['gemini'] },
+            primaryEnv: 'GEMINI_API_KEY',
+            install: { brew: 'gemini-cli' },
+          },
+        },
+      },
+    });
+    expect(m).toMatchObject({
+      name: 'gem',
+      description: 'gemini wrapper',
+      emoji: '♊',
+      homepage: 'https://example.com',
+      requires: { bins: ['gemini'] },
+      primary_env: 'GEMINI_API_KEY',
+      install: { brew: 'gemini-cli' },
+    });
+  });
+
+  it('omits optional keys that are absent rather than emitting null', () => {
+    const m = buildSkillManifest({
+      name: 'lean',
+      path: '/x',
+      root: 'skills',
+      manifest: { name: 'lean', description: 'd' },
+    });
+    expect(m).not.toHaveProperty('emoji');
+    expect(m).not.toHaveProperty('homepage');
+    expect(m).not.toHaveProperty('requires');
+    expect(m).not.toHaveProperty('install');
+    expect(m).not.toHaveProperty('primary_env');
   });
 });

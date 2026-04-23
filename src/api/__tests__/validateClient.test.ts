@@ -23,7 +23,7 @@ function pkg(): GraftPackage {
     schema: {
       schema_version: 2,
       framework_constraints: ['openclaw'],
-      defaults: { channels: ['chat'] },
+      defaults: { channels: ['telegram'] },
       fields: [],
     },
   };

@@ -9,7 +9,7 @@ function summary(overrides: Partial<OpenclawAgentSummary['universal']> = {}): Op
     universal: {
       model: 'anthropic/claude-sonnet-4.6',
       thinking: 'medium',
-      channels: ['chat', 'telegram'],
+      channels: ['telegram'],
       skills: [],
       ...overrides,
     },
@@ -34,7 +34,7 @@ describe('buildGraftFromOpenclaw', () => {
 
   it('copies channels into defaults when present', () => {
     const doc = buildGraftFromOpenclaw(summary());
-    expect(doc.defaults.channels).toEqual(['chat', 'telegram']);
+    expect(doc.defaults.channels).toEqual(['telegram']);
   });
 
   it('omits channels when the agent has none configured', () => {
@@ -78,6 +78,18 @@ describe('buildGraftFromOpenclaw', () => {
     const input = summary();
     const doc = buildGraftFromOpenclaw(input);
     doc.defaults.channels?.push('email');
-    expect(input.universal.channels).toEqual(['chat', 'telegram']);
+    expect(input.universal.channels).toEqual(['telegram']);
+  });
+
+  it('throws when an unsupported channel slips through (e.g. legacy `chat`)', () => {
+    expect(() => buildGraftFromOpenclaw(summary({ channels: ['chat', 'telegram'] }))).toThrow(
+      /unsupported channel/,
+    );
+  });
+
+  it('throws on a channel not yet wired in the launcher (e.g. discord)', () => {
+    expect(() => buildGraftFromOpenclaw(summary({ channels: ['discord'] }))).toThrow(
+      /unsupported channel/,
+    );
   });
 });

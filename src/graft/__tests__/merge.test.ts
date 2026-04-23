@@ -7,7 +7,7 @@ function baseDoc(): GraftDocument {
     schema_version: 2,
     framework_constraints: ['openclaw'],
     defaults: {
-      channels: ['chat'],
+      channels: ['telegram'],
       settings: { model: 'anthropic/claude-sonnet-4.6', thinking: 'medium' },
     },
     fields: [],

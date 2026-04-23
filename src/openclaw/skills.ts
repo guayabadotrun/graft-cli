@@ -2,18 +2,23 @@
 //
 // Responsibilities:
 //   - Scan an OpenClaw agent workspace for installed skills.
-//   - Parse each `SKILL.md` frontmatter (single-line YAML keys; `metadata`
-//     is single-line JSON, per the OpenClaw skill contract).
+//   - Parse each `SKILL.md` frontmatter using `gray-matter`, then enforce
+//     the OpenClaw spec via `validateSkillFrontmatter` (canonical
+//     contract, see grafts-marketplace.md §0.4.4).
 //   - Produce a tar.gz stream of any one skill directory, suitable for
 //     uploading as a GRAFT bundle.
 //
 // Both the launcher (at runtime, on demand) and the CLI (at `graft push`
 // time) consume this module so the on-disk skill format stays in one place.
+// Other framework launchers (Paperclip, Hermes…) are expected to ship
+// their own pre-parser that emits the same `<name>.manifest.json` shape;
+// the backend never parses SKILL.md.
 
 import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
 import { spawn } from 'node:child_process';
 import type { Readable } from 'node:stream';
+import matter from 'gray-matter';
 
 /** Roots scanned for installed skills, in precedence order (highest first). */
 export const SKILL_ROOTS = ['skills', '.agents/skills'] as const;
@@ -39,72 +44,141 @@ export interface ListSkillsResult {
   skills: InstalledSkill[];
   /** Per-directory parse failures, surfaced for diagnostics — not fatal. */
   errors: Array<{ path: string; error: string }>;
+  /**
+   * Per-name conflicts where a lower-precedence root was silently dropped
+   * because the same `name` already appeared in a higher-precedence root.
+   * The launcher logs these as WARN so the conflict is visible to the
+   * user in the in-UI agent log viewer (see grafts-marketplace.md §0.4.3).
+   * graft-cli currently ignores them.
+   */
+  duplicates: Array<{ name: string; winner: SkillRoot; loser: SkillRoot }>;
 }
 
 /** Skill names must match this — same as OpenClaw's snake_case convention. */
 const SKILL_NAME_PATTERN = /^[a-z0-9_-]+$/;
 
 // ─── Frontmatter parser ─────────────────────────────────────
+//
+// Strategy: parse with `gray-matter` (which accepts arbitrary YAML),
+// then enforce the OpenClaw single-line constraint with a strict
+// post-validator. This way we get a battle-tested parser AND keep the
+// canonical Guayaba SKILL.md spec honest. See §0.4.4 of the roadmap.
 
-function unquote(value: string): string {
-  const trimmed = value.trim();
-  if (trimmed.length < 2) return trimmed;
-  const first = trimmed[0];
-  const last = trimmed[trimmed.length - 1];
-  if ((first === '"' && last === '"') || (first === "'" && last === "'")) {
-    return trimmed.slice(1, -1);
+/** Top-level keys recognised by the OpenClaw skill spec. */
+const KNOWN_FRONTMATTER_KEYS = new Set([
+  'name',
+  'description',
+  'homepage',
+  'user-invocable',
+  'disable-model-invocation',
+  'command-dispatch',
+  'command-tool',
+  'command-arg-mode',
+  'metadata',
+]);
+
+/**
+ * Validates a parsed-by-gray-matter frontmatter object against the
+ * canonical Guayaba SKILL.md contract. Throws on any violation; returns
+ * the same object on success so it can be chained.
+ *
+ * Constraints enforced (mirrors OpenClaw upstream parser, see
+ * https://docs.openclaw.ai/tools/skills):
+ *   - `name`         (required, non-empty string, snake_case-ish)
+ *   - `description`  (required, non-empty string)
+ *   - all other keys must be in {@link KNOWN_FRONTMATTER_KEYS}
+ *   - `metadata`     (optional, plain object — single-line JSON in source)
+ *   - boolean keys must actually be booleans
+ *
+ * Multi-line YAML constructs (e.g. `description: |\n…`) are rejected at
+ * the source-text level by {@link assertSingleLineKeys} because the
+ * upstream parser doesn't accept them either.
+ */
+export function validateSkillFrontmatter(
+  data: Record<string, unknown>,
+): Record<string, unknown> {
+  if (typeof data.name !== 'string' || data.name.length === 0) {
+    throw new Error("SKILL.md frontmatter is missing required 'name' field");
   }
-  return trimmed;
-}
-
-function coerceScalar(raw: string): unknown {
-  const trimmed = raw.trim();
-  if (trimmed === '') return '';
-  if (trimmed === 'true') return true;
-  if (trimmed === 'false') return false;
-  if (trimmed === 'null' || trimmed === '~') return null;
-  if (/^-?\d+$/.test(trimmed)) return Number(trimmed);
-  if (/^-?\d*\.\d+$/.test(trimmed)) return Number(trimmed);
-  if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
-    try {
-      return JSON.parse(trimmed);
-    } catch {
-      // not JSON — fall through to string
+  if (!SKILL_NAME_PATTERN.test(data.name)) {
+    throw new Error(
+      `SKILL.md frontmatter 'name' must match ${SKILL_NAME_PATTERN.source}, got '${data.name}'`,
+    );
+  }
+  if (typeof data.description !== 'string' || data.description.length === 0) {
+    throw new Error("SKILL.md frontmatter is missing required 'description' field");
+  }
+  for (const key of Object.keys(data)) {
+    if (!KNOWN_FRONTMATTER_KEYS.has(key)) {
+      throw new Error(`SKILL.md frontmatter has unknown key '${key}'`);
     }
   }
-  return unquote(trimmed);
+  for (const boolKey of ['user-invocable', 'disable-model-invocation']) {
+    if (boolKey in data && typeof data[boolKey] !== 'boolean') {
+      throw new Error(`SKILL.md frontmatter '${boolKey}' must be a boolean`);
+    }
+  }
+  if ('metadata' in data) {
+    if (typeof data.metadata !== 'object' || data.metadata === null || Array.isArray(data.metadata)) {
+      throw new Error("SKILL.md frontmatter 'metadata' must be an object");
+    }
+  }
+  return data;
+}
+
+/**
+ * Reject multi-line YAML in the frontmatter source. OpenClaw's upstream
+ * parser only accepts single-line `key: value` pairs at the top level
+ * (per docs); we mirror that here so a SKILL.md that parses cleanly with
+ * `gray-matter` but would break upstream is caught at our boundary.
+ */
+function assertSingleLineKeys(blockSource: string): void {
+  const lines = blockSource.split('\n');
+  for (const line of lines) {
+    if (line.trim() === '' || line.trim().startsWith('#')) continue;
+    // Top-level keys must start at column 0 with `key:`. Indented lines
+    // (the start of a YAML block scalar or nested mapping) are rejected.
+    if (/^\s/.test(line)) {
+      throw new Error(
+        'SKILL.md frontmatter must use single-line keys only (no multi-line YAML blocks). ' +
+          'Use single-line JSON for `metadata`.',
+      );
+    }
+  }
 }
 
 /**
  * Parse a SKILL.md frontmatter block. Returns null if no frontmatter is
- * present; throws if the block is malformed (missing closing `---`, line
- * without colon, or missing required `name` field).
+ * present; throws if the block is malformed (missing closing `---`,
+ * unknown key, missing required `name`/`description`, or a multi-line
+ * YAML construct that would not survive a round-trip through OpenClaw's
+ * parser).
  */
 export function parseSkillFrontmatter(source: string): Record<string, unknown> | null {
   const normalised = source.replace(/\r\n/g, '\n');
   if (!normalised.startsWith('---\n')) return null;
 
+  // Locate the closing delimiter ourselves so we can give a precise error
+  // and so we can validate the raw block source (gray-matter throws a
+  // generic YAMLException on bad input which is hard to attribute).
   const closingIdx = normalised.indexOf('\n---', 4);
   if (closingIdx === -1) {
     throw new Error("SKILL.md frontmatter is missing closing '---' delimiter");
   }
+  const blockSource = normalised.slice(4, closingIdx);
+  assertSingleLineKeys(blockSource);
 
-  const block = normalised.slice(4, closingIdx);
-  const out: Record<string, unknown> = {};
-  for (const line of block.split('\n')) {
-    if (line.trim() === '' || line.trim().startsWith('#')) continue;
-    const colonIdx = line.indexOf(':');
-    if (colonIdx === -1) {
-      throw new Error(`SKILL.md frontmatter line has no colon: ${line}`);
-    }
-    const key = line.slice(0, colonIdx).trim();
-    out[key] = coerceScalar(line.slice(colonIdx + 1));
+  let parsed: matter.GrayMatterFile<string>;
+  try {
+    parsed = matter(normalised);
+  } catch (err) {
+    throw new Error(
+      `SKILL.md frontmatter is not valid YAML: ${err instanceof Error ? err.message : String(err)}`,
+    );
   }
 
-  if (typeof out.name !== 'string' || out.name.length === 0) {
-    throw new Error("SKILL.md frontmatter is missing required 'name' field");
-  }
-  return out;
+  const data = (parsed.data ?? {}) as Record<string, unknown>;
+  return validateSkillFrontmatter(data);
 }
 
 // ─── Scan ───────────────────────────────────────────────────
@@ -136,7 +210,7 @@ async function readSkill(dir: string, root: SkillRoot): Promise<InstalledSkill> 
   };
 }
 
-async function scanRoot(rootDir: string, root: SkillRoot): Promise<ListSkillsResult> {
+async function scanRoot(rootDir: string, root: SkillRoot): Promise<{ skills: InstalledSkill[]; errors: ListSkillsResult['errors'] }> {
   let entries: string[];
   try {
     entries = await fs.readdir(rootDir);
@@ -170,22 +244,94 @@ async function scanRoot(rootDir: string, root: SkillRoot): Promise<ListSkillsRes
  *
  * Skills found in `<workspace>/skills` take precedence over the same name
  * in `<workspace>/.agents/skills`; lower-precedence duplicates are dropped
- * silently, matching OpenClaw's own load-time behaviour.
+ * silently from `skills`, but reported via `duplicates` so callers (the
+ * launcher) can log them. See grafts-marketplace.md §0.4.3.
  */
 export async function listInstalledSkills(workspacePath: string): Promise<ListSkillsResult> {
-  const seen = new Set<string>();
+  const winners = new Map<string, SkillRoot>();
   const skills: InstalledSkill[] = [];
   const errors: ListSkillsResult['errors'] = [];
+  const duplicates: ListSkillsResult['duplicates'] = [];
   for (const root of SKILL_ROOTS) {
     const result = await scanRoot(path.join(workspacePath, root), root);
     for (const skill of result.skills) {
-      if (seen.has(skill.name)) continue;
-      seen.add(skill.name);
+      const winner = winners.get(skill.name);
+      if (winner !== undefined) {
+        duplicates.push({ name: skill.name, winner, loser: root });
+        continue;
+      }
+      winners.set(skill.name, root);
       skills.push(skill);
     }
     errors.push(...result.errors);
   }
-  return { skills, errors };
+  return { skills, errors, duplicates };
+}
+
+/**
+ * Normalised skill manifest emitted alongside each `<name>.tar.gz` in a
+ * GRAFT bundle. Persisted verbatim by the backend into
+ * `agent_skills.manifest`. The shape is framework-agnostic on purpose: a
+ * future Paperclip launcher will produce the same JSON from whatever its
+ * skill format looks like, and the backend never has to know.
+ *
+ * See grafts-marketplace.md §0.4.4 + §0.4.5.
+ */
+export interface SkillManifestJson {
+  name: string;
+  description: string;
+  emoji?: string;
+  homepage?: string;
+  /** OpenClaw `metadata.openclaw.requires` block (bins / env / config). */
+  requires?: Record<string, unknown>;
+  /** OpenClaw `metadata.openclaw.primaryEnv` (key the skill keys auth on). */
+  primary_env?: string;
+  /** OpenClaw `metadata.openclaw.install` block (brew/node/go/uv/download). */
+  install?: Record<string, unknown>;
+}
+
+function asObject(value: unknown): Record<string, unknown> | undefined {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : undefined;
+}
+
+function asNonEmptyString(value: unknown): string | undefined {
+  return typeof value === 'string' && value.length > 0 ? value : undefined;
+}
+
+/**
+ * Build the JSON manifest written next to a skill's tar.gz inside a GRAFT
+ * bundle. Pure projection of the parsed SKILL.md frontmatter — never
+ * reads the filesystem.
+ */
+export function buildSkillManifest(skill: InstalledSkill): SkillManifestJson {
+  const meta = asObject(skill.manifest.metadata);
+  const ocMeta = meta ? asObject(meta.openclaw) : undefined;
+
+  const out: SkillManifestJson = {
+    name: skill.name,
+    description: typeof skill.manifest.description === 'string' ? skill.manifest.description : '',
+  };
+
+  const emoji = skill.emoji ?? (ocMeta ? asNonEmptyString(ocMeta.emoji) : undefined);
+  if (emoji !== undefined) out.emoji = emoji;
+
+  const homepage = asNonEmptyString(skill.manifest.homepage);
+  if (homepage !== undefined) out.homepage = homepage;
+
+  if (ocMeta) {
+    const requires = asObject(ocMeta.requires);
+    if (requires !== undefined) out.requires = requires;
+
+    const primaryEnv = asNonEmptyString(ocMeta.primaryEnv);
+    if (primaryEnv !== undefined) out.primary_env = primaryEnv;
+
+    const install = asObject(ocMeta.install);
+    if (install !== undefined) out.install = install;
+  }
+
+  return out;
 }
 
 /**
