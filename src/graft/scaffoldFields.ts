@@ -52,7 +52,7 @@ function humanizeKey(key: string): string {
   return key
     .toLowerCase()
     .split('_')
-    .map((part) => (part.length === 0 ? part : part[0].toUpperCase() + part.slice(1)))
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(' ');
 }
 
