@@ -14,7 +14,7 @@ import type { GraftDocument } from './build.js';
  * `updated_at`, `author_id`, `status`).
  *
  * `status` is intentionally absent: a freshly exported GRAFT is always
- * a draft until the author submits it.
+ * a personal graft until the author submits it for marketplace review.
  *
  * `icon_path` / `cover_image_path` are S3 object keys, never URLs. The
  * CLI doesn't upload assets today, so they stay null in v0.x.
