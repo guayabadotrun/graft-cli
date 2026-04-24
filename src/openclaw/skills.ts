@@ -210,6 +210,21 @@ async function readSkill(dir: string, root: SkillRoot): Promise<InstalledSkill> 
   };
 }
 
+/**
+ * Returns true if the directory contains a readable `SKILL.md` file.
+ * Used to decide whether a directory IS a skill or merely a container
+ * (e.g. the clawhub group dir at `skills/<source>/<name>/SKILL.md`).
+ */
+async function hasSkillFile(dir: string): Promise<boolean> {
+  try {
+    const st = await fs.stat(path.join(dir, 'SKILL.md'));
+    return st.isFile();
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return false;
+    throw err;
+  }
+}
+
 async function scanRoot(rootDir: string, root: SkillRoot): Promise<{ skills: InstalledSkill[]; errors: ListSkillsResult['errors'] }> {
   let entries: string[];
   try {
@@ -228,7 +243,42 @@ async function scanRoot(rootDir: string, root: SkillRoot): Promise<{ skills: Ins
     try {
       const st = await fs.stat(dir);
       if (!st.isDirectory()) continue;
-      skills.push(await readSkill(dir, root));
+
+      // Layout 1 (flat): `<root>/<skill>/SKILL.md` — historical CLI
+      // convention, what `graft init` produces.
+      if (await hasSkillFile(dir)) {
+        skills.push(await readSkill(dir, root));
+        continue;
+      }
+
+      // Layout 2 (grouped): `<root>/<source>/<skill>/SKILL.md` — what
+      // `openclaw skills install` from clawhub produces (the outer dir
+      // is the source/namespace, the inner one is the actual skill).
+      // Descend exactly one more level — we deliberately do NOT recurse
+      // arbitrarily to keep the scan cheap and predictable.
+      let inner: string[];
+      try {
+        inner = await fs.readdir(dir);
+      } catch (err) {
+        const code = (err as NodeJS.ErrnoException).code;
+        if (code === 'ENOTDIR') continue;
+        throw err;
+      }
+      for (const sub of inner) {
+        if (sub.startsWith('.')) continue;
+        const subDir = path.join(dir, sub);
+        try {
+          const subSt = await fs.stat(subDir);
+          if (!subSt.isDirectory()) continue;
+          if (!(await hasSkillFile(subDir))) continue;
+          skills.push(await readSkill(subDir, root));
+        } catch (err) {
+          errors.push({
+            path: subDir,
+            error: err instanceof Error ? err.message : String(err),
+          });
+        }
+      }
     } catch (err) {
       errors.push({
         path: dir,
@@ -350,15 +400,40 @@ export async function resolveSkillDir(
     throw err;
   }
   for (const root of SKILL_ROOTS) {
+    // Flat: `<root>/<name>/SKILL.md`.
     const dir = path.join(workspacePath, root, name);
     try {
       const st = await fs.stat(dir);
-      if (!st.isDirectory()) continue;
-      await fs.stat(path.join(dir, 'SKILL.md'));
-      return { root, dir };
+      if (st.isDirectory() && (await hasSkillFile(dir))) {
+        return { root, dir };
+      }
     } catch (err) {
-      if ((err as NodeJS.ErrnoException).code === 'ENOENT') continue;
+      if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err;
+    }
+
+    // Grouped: `<root>/<source>/<name>/SKILL.md` — clawhub layout. Walk
+    // the immediate children of <root> looking for a child group dir
+    // that contains `<name>/SKILL.md`. First match wins (group order is
+    // filesystem order; clawhub never installs the same skill twice).
+    let groups: string[];
+    try {
+      groups = await fs.readdir(path.join(workspacePath, root));
+    } catch (err) {
+      const code = (err as NodeJS.ErrnoException).code;
+      if (code === 'ENOENT' || code === 'ENOTDIR') continue;
       throw err;
+    }
+    for (const group of groups) {
+      if (group.startsWith('.')) continue;
+      const candidate = path.join(workspacePath, root, group, name);
+      try {
+        const st = await fs.stat(candidate);
+        if (st.isDirectory() && (await hasSkillFile(candidate))) {
+          return { root, dir: candidate };
+        }
+      } catch (err) {
+        if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err;
+      }
     }
   }
   const err = new Error(`Skill not found: ${name}`);

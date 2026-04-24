@@ -155,6 +155,37 @@ describe('listInstalledSkills', () => {
     const r = await listInstalledSkills(workspace);
     expect(r.skills[0]!.emoji).toBe('♊️');
   });
+
+  it('discovers grouped skills at <root>/<source>/<name>/SKILL.md (clawhub layout)', async () => {
+    // Simulate `openclaw skills install github` which lays out the
+    // skill under `skills/<source>/<name>/SKILL.md` (the outer dir is
+    // the source/namespace, e.g. `github`, the inner one is the actual
+    // skill, also named `github`).
+    const dir = path.join(workspace, 'skills', 'github', 'github');
+    await fs.mkdir(dir, { recursive: true });
+    await fs.writeFile(
+      path.join(dir, 'SKILL.md'),
+      '---\nname: github\ndescription: gh cli wrapper\n---\nbody',
+      'utf8',
+    );
+    const r = await listInstalledSkills(workspace);
+    expect(r.skills.map((s) => s.name)).toEqual(['github']);
+    expect(r.skills[0]!.path).toBe(dir);
+    expect(r.errors).toEqual([]);
+  });
+
+  it('mixes flat and grouped layouts under the same root', async () => {
+    await writeSkill(workspace, 'skills', 'flat', '---\nname: flat\ndescription: f\n---');
+    const grouped = path.join(workspace, 'skills', 'group', 'nested');
+    await fs.mkdir(grouped, { recursive: true });
+    await fs.writeFile(
+      path.join(grouped, 'SKILL.md'),
+      '---\nname: nested\ndescription: n\n---',
+      'utf8',
+    );
+    const r = await listInstalledSkills(workspace);
+    expect(r.skills.map((s) => s.name).sort()).toEqual(['flat', 'nested']);
+  });
 });
 
 describe('resolveSkillDir', () => {
@@ -194,6 +225,19 @@ describe('resolveSkillDir', () => {
   it('does not match a directory without SKILL.md', async () => {
     await fs.mkdir(path.join(workspace, 'skills', 'naked'), { recursive: true });
     await expect(resolveSkillDir(workspace, 'naked')).rejects.toMatchObject({ code: 'ENOENT' });
+  });
+
+  it('resolves grouped skills at <root>/<source>/<name>/SKILL.md (clawhub layout)', async () => {
+    const dir = path.join(workspace, 'skills', 'github', 'github');
+    await fs.mkdir(dir, { recursive: true });
+    await fs.writeFile(
+      path.join(dir, 'SKILL.md'),
+      '---\nname: github\ndescription: gh\n---',
+      'utf8',
+    );
+    const r = await resolveSkillDir(workspace, 'github');
+    expect(r.dir).toBe(dir);
+    expect(r.root).toBe('skills');
   });
 });
 
