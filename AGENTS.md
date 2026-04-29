@@ -78,8 +78,14 @@ All requests go to `API_BASE_URL` (default `https://api.guayaba.run/api/v1`).
 
 HTTP outcomes:
 - `validate`: 200 → ok+warnings, 422 → validation issues, 401 → bad key
-- `push /grafts`: 201 → success (returns `id`, `version_id`, `bundle_s3_key`), 422/409 → issues, 401 → bad key, 403 → slave key
+- `push /grafts`: 201 → success (returns `id`, `version_id`, `bundle_s3_key`), 422 → structured field issues, 409 → conflict (version already exists or slug taken — message includes a fix hint: "Bump metadata.version" or "Choose a different slug"), 401 → bad key, 403 → slave key
 - `push assets`: 200 → ok+path, 422 → issues, 401 → bad key, 403 → slave key
+
+## Non-obvious rules (continued)
+
+- **`graft init` output** — the "Next steps" section names `graft.json` explicitly as the main file to edit, then lists sidecars. Earlier it only mentioned sidecars, leading authors to miss metadata/schema changes needed in `graft.json`.
+- **Slug validation in `init` prompt** — `clack.ts` validates slug format client-side (`/^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/`, max 100 chars) to give immediate feedback before hitting the network. The backend remains the authoritative validator — this is UX, not a gate.
+- **409 vs 422 in push** — `pushClient.ts` handles 409 separately from 422. If the 409 body contains `errors.metadata.version` (version already exists for slug), the message gets a ` → Bump metadata.version in graft.json and push again.` hint. If there are no structured errors (slug owned by another author), the fallback hint suggests choosing a different slug.
 
 ## Current known debt / stale comments
 

@@ -319,7 +319,7 @@ program
       }
       console.log('');
       console.log('Files:');
-      console.log('  graft.json (declarative schema)');
+      console.log('  graft.json          ← main file: edit metadata + schema fields here');
       for (const f of copied) console.log(`  ${f} (copied from workspace)`);
       for (const f of stubsCreated) console.log(`  ${f} (empty stub)`);
       const skipped = missingInWorkspace.filter((f) => !stubsCreated.includes(f));
@@ -330,7 +330,15 @@ program
       if (copiedTools) console.log('  TOOLS.md (copied from workspace)');
       if (copiedInstallScript) console.log('  install.sh (copied from workspace; runs once on first apply)');
       console.log('');
-      console.log(`Edit the sidecars to taste, then run: graft validate --framework ${framework}`);
+      console.log('Next steps:');
+      console.log(`  1. Open graft.json — review and update metadata (name, slug, description, version) and schema fields.`);
+      const sidecarList = [...copied, ...stubsCreated];
+      if (sidecarList.length > 0) {
+        console.log(`  2. Edit the sidecars (${sidecarList.join(', ')}) to match your agent's personality.`);
+        console.log(`  3. Run: graft validate --framework ${framework}`);
+      } else {
+        console.log(`  2. Run: graft validate --framework ${framework}`);
+      }
     },
   );
 

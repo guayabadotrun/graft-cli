@@ -9,11 +9,24 @@ import type { GraftMetadata } from '../graft/package.js';
 import { KNOWN_CATEGORY_SLUGS } from '../graft/package.js';
 import { parseTagsInput } from '../graft/metadata.js';
 
-// Minimal "non-empty" guard for required free-text fields. Format checks
-// (slug regex, semver, length caps) are the backend's job — see
-// `graft validate` and ValidateGraftRequest.
+// Minimal "non-empty" guard for required free-text fields. Deep format
+// validation is the backend's job (`graft validate`), but catching obvious
+// slug mistakes before hitting the network makes for much better UX.
 const requireNonEmpty = (label: string) => (value: string): string | undefined =>
   value.trim().length === 0 ? `${label} is required.` : undefined;
+
+// Slug: lowercase letters, digits, hyphens; must start and end with a
+// letter or digit; max 100 chars. Matches the backend's Laravel rule
+// `regex:/^[a-z0-9][a-z0-9-]*[a-z0-9]$/` (single-char slugs are also ok).
+const validateSlug = (value: string): string | undefined => {
+  const s = value.trim();
+  if (s.length === 0) return 'Slug is required.';
+  if (s.length > 100) return 'Slug must be at most 100 characters.';
+  if (!/^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/.test(s)) {
+    return 'Slug must be lowercase letters, digits, and hyphens only, and cannot start or end with a hyphen (e.g. my-telegram-bot).';
+  }
+  return undefined;
+};
 
 export function createClackPrompter(): Prompter {
   return {
@@ -28,7 +41,7 @@ export function createClackPrompter(): Prompter {
       const slug = await text({
         message: 'Slug (kebab-case, max 100 chars). Used in marketplace URLs.',
         initialValue: defaults.slug,
-        validate: requireNonEmpty('Slug'),
+        validate: validateSlug,
       });
       if (isCancel(slug)) return null;
 

@@ -331,13 +331,42 @@ export async function pushGraftPackage(
     };
   }
 
-  if (response.status === 422 || response.status === 409) {
+  if (response.status === 409) {
+    // If the backend returned structured per-field errors (e.g. a version
+    // collision with `errors.metadata.version`), pass them through so the
+    // CLI can show the exact field. We still append a fix hint to any
+    // version-related message so the user knows what to do next.
+    const structuredIssues = normaliseLaravelErrors((body as { errors?: unknown }).errors);
+    if (structuredIssues.length > 0) {
+      const annotated = structuredIssues.map((issue) => {
+        const isVersionField = issue.field.includes('version');
+        return isVersionField
+          ? { ...issue, message: `${issue.message} → Bump metadata.version in graft.json and push again.` }
+          : issue;
+      });
+      return { ok: false, issues: annotated };
+    }
+    // No structured errors: surface the top-level message with a contextual hint.
+    const backendMessage =
+      typeof (body as { message?: unknown }).message === 'string'
+        ? (body as { message: string }).message
+        : 'Push rejected (HTTP 409).';
+    const isVersionConflict =
+      backendMessage.toLowerCase().includes('version') ||
+      backendMessage.toLowerCase().includes('bundle');
+    const hint = isVersionConflict
+      ? ' → Bump metadata.version in graft.json and push again.'
+      : ' → If this slug belongs to another account, choose a different slug.';
+    return { ok: false, issues: [{ field: 'envelope', message: backendMessage + hint }] };
+  }
+
+  if (response.status === 422) {
     const issues = normaliseLaravelErrors((body as { errors?: unknown }).errors);
     if (issues.length === 0) {
       const message =
         typeof (body as { message?: unknown }).message === 'string'
           ? (body as { message: string }).message
-          : `Push rejected (HTTP ${response.status}).`;
+          : 'Push rejected (HTTP 422).';
       issues.push({ field: 'envelope', message });
     }
     return { ok: false, issues };
