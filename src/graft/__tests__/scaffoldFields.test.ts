@@ -2,119 +2,105 @@ import { describe, it, expect } from 'vitest';
 
 import {
   augmentSchemaWithMechanicalFields,
-  deriveScaffoldFields,
   extractChannels,
 } from '../scaffoldFields.js';
-import type { GraftDocument } from '../build.js';
-import type { SkillManifestJson } from '../../openclaw/skills.js';
+import type { GraftDocument, GraftField } from '../build.js';
 
-const skillWithEnv = (name: string, primary_env?: string): SkillManifestJson => ({
-  name,
-  description: `${name} skill`,
-  ...(primary_env ? { primary_env } : {}),
-});
-
-describe('deriveScaffoldFields', () => {
-  it('emits one secret field per skill that declares primary_env', () => {
-    const fields = deriveScaffoldFields({
-      skillManifests: [
-        skillWithEnv('alpha', 'ALPHA_API_KEY'),
-        skillWithEnv('beta', 'BETA_TOKEN'),
-      ],
-      channels: [],
-    });
-
-    expect(fields).toHaveLength(2);
-    expect(fields[0]).toMatchObject({
-      id: 'alpha_api_key',
-      type: 'secret',
-      required: true,
-      binding: 'settings.secrets.ALPHA_API_KEY',
-    });
-    expect(fields[0].help).toContain('"alpha"');
-    expect(fields[1]).toMatchObject({
-      id: 'beta_token',
-      binding: 'settings.secrets.BETA_TOKEN',
-    });
-  });
-
-  it('skips skills without primary_env', () => {
-    const fields = deriveScaffoldFields({
-      skillManifests: [skillWithEnv('quiet')],
-      channels: [],
-    });
-    expect(fields).toEqual([]);
-  });
-
-  it('emits one secret field per channel-required env key', () => {
-    const fields = deriveScaffoldFields({
-      skillManifests: [],
-      channels: ['telegram'],
-    });
-
-    expect(fields).toHaveLength(1);
-    expect(fields[0]).toMatchObject({
-      id: 'telegram_bot_token',
-      binding: 'settings.secrets.TELEGRAM_BOT_TOKEN',
-    });
-    expect(fields[0].help).toContain('"telegram"');
-  });
-
-  it('ignores unknown channels (forward-compatibility)', () => {
-    const fields = deriveScaffoldFields({
-      skillManifests: [],
-      // Only `telegram` is in CHANNEL_REQUIRED_SECRETS today.
-      channels: ['telegram', 'discord'],
-    });
-    expect(fields).toHaveLength(1);
-    expect(fields[0].id).toBe('telegram_bot_token');
-  });
-
-  it('deduplicates when a skill and a channel share the same env key', () => {
-    // Contrived but defensive: a skill that happens to read TELEGRAM_BOT_TOKEN
-    // shouldn't produce a duplicate secret field.
-    const fields = deriveScaffoldFields({
-      skillManifests: [skillWithEnv('telegram-helper', 'TELEGRAM_BOT_TOKEN')],
-      channels: ['telegram'],
-    });
-    expect(fields).toHaveLength(1);
-    expect(fields[0].help).toContain('"telegram-helper"'); // skill wins (declared first)
-  });
-});
+const baseSchema: GraftDocument = {
+  schema_version: 2,
+  framework_constraints: ['openclaw'],
+  defaults: { channels: ['telegram'] },
+  fields: [],
+};
 
 describe('augmentSchemaWithMechanicalFields', () => {
-  const baseSchema: GraftDocument = {
-    schema_version: 2,
-    framework_constraints: ['openclaw'],
-    defaults: { channels: ['telegram'] },
-    fields: [],
-  };
-
-  it('appends derived fields when the schema has none', () => {
-    const augmented = augmentSchemaWithMechanicalFields(baseSchema, {
-      skillManifests: [skillWithEnv('alpha', 'ALPHA_API_KEY')],
-      channels: ['telegram'],
-    });
-    expect(augmented.fields).toHaveLength(2);
-    expect(augmented.fields.map((f) => f.id)).toEqual([
-      'alpha_api_key',
-      'telegram_bot_token',
-    ]);
+  it('returns a schema with no fields when none are declared', () => {
+    const augmented = augmentSchemaWithMechanicalFields(baseSchema);
+    expect(augmented.fields).toEqual([]);
   });
 
-  it('preserves author-declared fields and skips collisions on id', () => {
-    const authorField = {
-      id: 'telegram_bot_token',
-      type: 'secret',
-      label: 'My custom label',
-      required: true,
+  it('preserves author-declared fields verbatim', () => {
+    const authorField: GraftField = {
+      id: 'free_text',
+      type: 'text',
+      label: 'Free text',
+      required: false,
     };
-    const augmented = augmentSchemaWithMechanicalFields(
-      { ...baseSchema, fields: [authorField] },
-      { skillManifests: [], channels: ['telegram'] },
-    );
+    const augmented = augmentSchemaWithMechanicalFields({
+      ...baseSchema,
+      fields: [authorField],
+    });
     expect(augmented.fields).toHaveLength(1);
-    expect(augmented.fields[0]).toBe(authorField);
+    expect(augmented.fields[0]).toMatchObject({
+      id: 'free_text',
+      type: 'text',
+    });
+  });
+
+  it('does NOT auto-attach materialize for GITHUB_TOKEN — gh reads $GITHUB_TOKEN natively', () => {
+    // The registry is intentionally empty: every entry is a contract
+    // that the binary exists in the launcher image. GITHUB_TOKEN was
+    // removed because (a) `gh` is not in the launcher base image and
+    // (b) `gh` reads $GITHUB_TOKEN natively, so no materialize is
+    // needed. The secret still flows to the agent as an env var via
+    // the launcher's settings.secrets.* injection.
+    const authorField: GraftField = {
+      id: 'github_token',
+      type: 'secret',
+      label: 'GitHub Token',
+      required: true,
+      binding: 'settings.secrets.GITHUB_TOKEN',
+    };
+    const augmented = augmentSchemaWithMechanicalFields({
+      ...baseSchema,
+      fields: [authorField],
+    });
+    expect(augmented.fields).toHaveLength(1);
+    expect(augmented.fields[0].materialize).toBeUndefined();
+  });
+
+  it('does NOT overwrite an author-declared materialize block', () => {
+    const customMaterialize = {
+      type: 'command' as const,
+      run: ['my-custom-tool', 'login'],
+      stdin: '{{value}}',
+    };
+    const authorField: GraftField = {
+      id: 'github_token',
+      type: 'secret',
+      label: 'GitHub Token',
+      required: true,
+      binding: 'settings.secrets.GITHUB_TOKEN',
+      materialize: customMaterialize,
+    };
+    const augmented = augmentSchemaWithMechanicalFields({
+      ...baseSchema,
+      fields: [authorField],
+    });
+    expect(augmented.fields[0].materialize).toBe(customMaterialize);
+  });
+
+  it('does NOT attach materialize for unknown env keys', () => {
+    const authorField: GraftField = {
+      id: 'alpha_api_key',
+      type: 'secret',
+      label: 'Alpha',
+      required: true,
+      binding: 'settings.secrets.ALPHA_API_KEY',
+    };
+    const augmented = augmentSchemaWithMechanicalFields({
+      ...baseSchema,
+      fields: [authorField],
+    });
+    expect(augmented.fields[0].materialize).toBeUndefined();
+  });
+
+  it('does NOT derive a TELEGRAM_BOT_TOKEN field from the telegram channel (the channel UI owns it)', () => {
+    const augmented = augmentSchemaWithMechanicalFields({
+      ...baseSchema,
+      fields: [],
+    });
+    expect(augmented.fields).toEqual([]);
   });
 
   it('returns a new object — does not mutate the input schema', () => {
@@ -122,15 +108,22 @@ describe('augmentSchemaWithMechanicalFields', () => {
       schema_version: 2,
       framework_constraints: ['openclaw'],
       defaults: { channels: ['telegram'] },
-      fields: [],
+      fields: [
+        {
+          id: 'github_token',
+          type: 'secret',
+          label: 'GitHub Token',
+          required: true,
+          binding: 'settings.secrets.GITHUB_TOKEN',
+        },
+      ],
     };
-    const augmented = augmentSchemaWithMechanicalFields(input, {
-      skillManifests: [],
-      channels: ['telegram'],
-    });
+    const before = JSON.stringify(input);
+    const augmented = augmentSchemaWithMechanicalFields(input);
     expect(augmented).not.toBe(input);
-    expect(input.fields).toEqual([]); // unchanged
-    expect(augmented.fields).toHaveLength(1);
+    expect(JSON.stringify(input)).toBe(before); // unchanged
+    // No auto-materialize for GITHUB_TOKEN; field is preserved as-is.
+    expect(augmented.fields[0]).toMatchObject({ id: 'github_token' });
   });
 });
 

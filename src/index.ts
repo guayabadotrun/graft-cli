@@ -5,7 +5,16 @@
 // belongs here. Right now we expose the package version and the
 // OpenClaw workspace reader.
 
-export const VERSION = '0.0.1';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
+
+// Read version from package.json at module load. Works for both the
+// bundled dist (`dist/index.js` -> `../package.json`) and src under
+// tsx (`src/index.ts` -> `../package.json`). tsup shims
+// `import.meta.url` for the CJS build.
+const pkgPath = join(dirname(fileURLToPath(import.meta.url)), '..', 'package.json');
+export const VERSION = (JSON.parse(readFileSync(pkgPath, 'utf8')) as { version: string }).version;
 
 export {
   readOpenclawWorkspace,
@@ -43,14 +52,8 @@ export type {
   BuildGraftBundleResult,
 } from './graft/bundle.js';
 
-export { mergeDecisionsIntoGraft } from './graft/merge.js';
-export { collectMarkdownDecisions } from './prompts/markdown.js';
-export type { MarkdownDecisions, CollectResult } from './prompts/markdown.js';
 export type {
   Prompter,
-  MarkdownDecision,
-  MarkdownPromptInput,
-  MarkdownTarget,
   MetadataResult,
 } from './prompts/types.js';
 

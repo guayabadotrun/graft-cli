@@ -1,0 +1,60 @@
+---
+description: Guayaba platform context for graft-cli development
+alwaysApply: true
+---
+
+# graft-cli — Agent Context
+
+`@guayaba/graft-cli` exports a `graft` binary that turns a running OpenClaw agent workspace into a publishable Guayaba GRAFT template (schema + skills tarball).
+
+## CLI commands
+
+| Command | Auth needed? |
+|---|---|
+| `graft init --framework openclaw [-w <workspace>] [-o <out>]` | No |
+| `graft validate --framework openclaw [-i <scaffold>]` | Yes — `$GUAYABA_API_KEY` |
+| `graft pack --framework openclaw [-i <scaffold>] [-o out.tar.gz]` | No |
+| `graft push --framework openclaw [-i <scaffold>] [--icon] [--cover]` | Yes — `$GUAYABA_API_KEY` |
+
+## Key constraints
+
+- Only framework: `openclaw`. `SUPPORTED_FRAMEWORKS = ['openclaw']`.
+- `ALLOWED_GRAFT_CHANNELS = ['telegram']` — `chat` is NOT a channel.
+- Scaffold schema file is `graft.json` (not `schema.json`). Bundle writes `schema.json` + `metadata.json` separately inside the tar.
+- `validate` requires an API key even though it's read-only — the endpoint is auth-gated.
+- `$GUAYABA_API_BASE_URL` overrides the default `https://api.guayaba.run/api/v1`. No CLI flag for this.
+- `install.sh` in the workspace is force-chmod'd to `0755` in the bundle regardless of source mode.
+- Only master API keys work — slave keys get HTTP 403.
+- `augmentSchemaWithMechanicalFields` must be called before POSTing so the form-field `schema` matches the bundled `schema.json`. `KNOWN_MATERIALIZERS` is currently empty `{}`.
+- `schema_version: 2` only — the only value the backend validator accepts.
+- Asset endpoints use method-spoofing: `POST` with `_method=PUT`, not real `PUT`.
+
+## API endpoints called
+
+- `POST /grafts/validate` — auth required, JSON body
+- `POST /grafts` — multipart (`metadata`, `schema`, `bundle`)
+- `POST /grafts/{slug}/assets/{icon|cover}` — multipart with `_method=PUT`
+
+
+## Platform map (all repos)
+
+| Service | Stack | Port(s) | Purpose |
+|---|---|---|---|
+| `convolution-api` | Laravel 11 / PHP / MySQL | 9090 | Central backend: agents, billing, auth, proxy to launchers |
+| `guayaba-manager-ui` | React 18 / TypeScript / Vite | 5173 | Web UI: wizard, chat, marketplace |
+| `ws-proxy` | Node.js / TypeScript | 18800 | WS proxy: browser ↔ agent container |
+| `openclaw-launcher` | Node.js / TypeScript | 18789/18790/18791 | Agent sidecar: config, gateway, control plane |
+| `graft-cli` | Node.js / TypeScript | — | CLI: build/validate/push GRAFT bundles |
+| `gene-seed` | Markdown | — | Internal docs + contracts hub |
+| `guayaba-docs` | Markdown / GitBook | — | User-facing public docs |
+
+**Auth between services:**
+- Browser → backend: Sanctum session cookie
+- Public API clients → backend: `Authorization: Bearer g_master_*` or `g_agent_*`
+- ws-proxy → backend: `Authorization: Bearer $PROXY_API_KEY` + `X-User-Token: <token>`
+- openclaw-launcher → backend: `Authorization: Bearer $BACKEND_API_KEY` (per-agent key)
+- ws-proxy → gateway: `?token=<gateway_token>` + injected into connect frame
+
+**Cross-cutting constraints:** English only. `channels[]` only accepts `["telegram"]`. GRAFT `schema_version` must be integer `2`. Keys: `g_master_*` = account-level, `g_agent_*` = single-agent scoped.
+
+See `AGENTS.md` for full briefing.

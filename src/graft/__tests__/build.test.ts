@@ -59,14 +59,14 @@ describe('buildGraftFromOpenclaw', () => {
     expect(doc.fields).toEqual([]);
   });
 
-  it('does not leak bio/knowledge/extra_instructions from markdown', () => {
+  it('does not leak personality / vibe / knowledge_seed from markdown', () => {
     const doc = buildGraftFromOpenclaw({
       ...summary(),
       rawMarkdown: { soul: '# I am the agent\n\nLong evolved bio...' },
     });
-    expect(doc.defaults).not.toHaveProperty('bio');
-    expect(doc.defaults).not.toHaveProperty('knowledge');
-    expect(doc.defaults.settings).not.toHaveProperty('extra_instructions');
+    expect(doc.defaults).not.toHaveProperty('personality');
+    expect(doc.defaults).not.toHaveProperty('vibe');
+    expect(doc.defaults).not.toHaveProperty('knowledge_seed');
   });
 
   it('does not include a steps key (reserved for hand-authored templates)', () => {

@@ -105,7 +105,11 @@ describe('pushGraftPackage — bundle only', () => {
     expect(reqInit.body).toBeInstanceOf(FormData);
     const form = reqInit.body as FormData;
     expect(form.get('metadata')).toBe(JSON.stringify(pkg().metadata));
-    expect(form.get('schema')).toBe(JSON.stringify(pkg().schema));
+    // Schema is augmented (materialize enrichment) before being POSTed.
+    // For this fixture the schema declares no fields, so the augmenter
+    // is a no-op on `fields[]`.
+    const sentSchema = JSON.parse(form.get('schema') as string);
+    expect(sentSchema.fields).toEqual([]);
     const bundle = form.get('bundle');
     expect(bundle).toBeInstanceOf(Blob);
     expect((bundle as Blob).type).toBe('application/gzip');

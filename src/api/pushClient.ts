@@ -16,6 +16,7 @@ import { basename, extname } from 'node:path';
 import { Readable } from 'node:stream';
 import type { GraftPackage } from '../graft/package.js';
 import { buildGraftBundle } from '../graft/bundle.js';
+import { augmentSchemaWithMechanicalFields } from '../graft/scaffoldFields.js';
 import { API_BASE_URL } from '../config.js';
 
 export interface PushClientOptions {
@@ -146,6 +147,11 @@ async function uploadAsset(
 
   const filename = basename(filePath);
   const form = new FormData();
+  // Laravel doesn't parse multipart bodies on PUT/PATCH/DELETE (PHP itself
+  // only populates `$_FILES` for POST). The framework's standard workaround
+  // is form-method spoofing: POST with a `_method=PUT` field. The route is
+  // still matched as PUT, and `$request->file('file')` works as expected.
+  form.append('_method', 'PUT');
   form.append('file', new Blob([bytes], { type: mimeFor(filename) }), filename);
 
   const url = joinUrl(`/grafts/${encodeURIComponent(slug)}/assets/${type}`);
@@ -153,7 +159,7 @@ async function uploadAsset(
   let response: Response;
   try {
     response = await fetchFn(url, {
-      method: 'PUT',
+      method: 'POST',
       headers: {
         Accept: 'application/json',
         Authorization: `Bearer ${opts.apiKey}`,
@@ -247,13 +253,31 @@ export async function pushGraftPackage(
   // Build the bundle into memory. The bundle builder also handles tempdir
   // cleanup internally — see graft/bundle.ts. Failures here surface as
   // PushRequestError so the CLI can exit cleanly without a stack trace.
+  //
+  // Mechanical-field augmentation is done up-front (here, not implicitly
+  // inside the bundler) so that the `schema` form field we POST matches
+  // exactly what ends up inside the bundle. The backend persists the
+  // form-field schema, not the bundle one, so without this step derived
+  // materialize blocks would silently disappear from
+  // `graft_versions.schema`.
+  let augmentedPkg: GraftPackage = pkg;
+  try {
+    const augmentedSchema = augmentSchemaWithMechanicalFields(pkg.schema);
+    augmentedPkg = { metadata: pkg.metadata, schema: augmentedSchema };
+  } catch (err) {
+    throw new PushRequestError(
+      `Failed to derive mechanical schema fields: ${(err as Error).message}`,
+      err,
+    );
+  }
+
   const buildFn = opts.buildBundleImpl ?? buildGraftBundle;
   let bundleBytes: Buffer;
   try {
     const built = await buildFn({
       workspacePath,
-      metadata: pkg.metadata,
-      schema: pkg.schema,
+      metadata: augmentedPkg.metadata,
+      schema: augmentedPkg.schema,
     });
     [bundleBytes] = await Promise.all([streamToBuffer(built.stream), built.done]);
   } catch (err) {
@@ -265,8 +289,8 @@ export async function pushGraftPackage(
 
   const url = joinUrl('/grafts');
   const form = new FormData();
-  form.append('metadata', JSON.stringify(pkg.metadata));
-  form.append('schema', JSON.stringify(pkg.schema));
+  form.append('metadata', JSON.stringify(augmentedPkg.metadata));
+  form.append('schema', JSON.stringify(augmentedPkg.schema));
   form.append('bundle', new Blob([bundleBytes], { type: 'application/gzip' }), 'graft.tar.gz');
 
   let response: Response;

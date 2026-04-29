@@ -1,59 +1,22 @@
 // @clack/prompts adapter for the `Prompter` interface.
 //
-// Kept thin on purpose: any logic worth testing lives in
-// `prompts/markdown.ts`. This file is just the wire-up to clack and is
+// Kept thin on purpose: this file is just the wire-up to clack and is
 // exercised end-to-end via the CLI smoke path, not via unit tests.
 
-import { isCancel, select, text, log } from '@clack/prompts';
-import type {
-  MarkdownDecision,
-  MarkdownPromptInput,
-  MetadataResult,
-  Prompter,
-} from './types.js';
+import { isCancel, text } from '@clack/prompts';
+import type { MetadataResult, Prompter } from './types.js';
 import type { GraftMetadata } from '../graft/package.js';
 import { KNOWN_CATEGORY_SLUGS } from '../graft/package.js';
 import { parseTagsInput } from '../graft/metadata.js';
 
 // Minimal "non-empty" guard for required free-text fields. Format checks
 // (slug regex, semver, length caps) are the backend's job — see
-// `graft init --validate <api-url>` and ValidateGraftRequest.
+// `graft validate` and ValidateGraftRequest.
 const requireNonEmpty = (label: string) => (value: string): string | undefined =>
   value.trim().length === 0 ? `${label} is required.` : undefined;
 
-const FILE_LABELS: Record<string, string> = {
-  soul: 'SOUL.md',
-  memory: 'MEMORY.md',
-  identity: 'IDENTITY.md',
-};
-
-const TARGET_LABELS: Record<string, string> = {
-  bio: 'bio',
-  knowledge: 'knowledge',
-  extra_instructions: 'settings.extra_instructions',
-};
-
 export function createClackPrompter(): Prompter {
   return {
-    async askIncludeMarkdown(input: MarkdownPromptInput): Promise<MarkdownDecision> {
-      const fileLabel = FILE_LABELS[input.file] ?? `${input.file}.md`;
-      const targetLabel = TARGET_LABELS[input.target] ?? input.target;
-
-      log.info(`${fileLabel} (${input.lines} non-blank lines) preview:\n${input.preview}`);
-
-      const choice = await select({
-        message: `Include ${fileLabel} as ${targetLabel} in the GRAFT?`,
-        options: [
-          { value: 'skip', label: 'Skip — leave this field empty' },
-          { value: 'include', label: 'Include — copy the file contents into the GRAFT' },
-        ],
-        initialValue: 'skip',
-      });
-
-      if (isCancel(choice)) return 'cancel';
-      return choice as MarkdownDecision;
-    },
-
     async askMetadata(defaults: GraftMetadata): Promise<MetadataResult> {
       const name = await text({
         message: 'GRAFT display name (max 150 chars).',
@@ -106,9 +69,12 @@ export function createClackPrompter(): Prompter {
       });
       if (isCancel(authorName)) return null;
 
-      const trimmedShort = shortDescription.trim();
-      const trimmedDescription = description.trim();
-      const trimmedAuthor = authorName.trim();
+      // @clack/prompts returns `undefined` when the user submits an
+      // empty optional field (no validate hook). Coerce to '' before
+      // .trim() to keep the optional-fields code path crash-free.
+      const trimmedShort = (shortDescription ?? '').trim();
+      const trimmedDescription = (description ?? '').trim();
+      const trimmedAuthor = (authorName ?? '').trim();
 
       return {
         slug: slug.trim(),
@@ -116,8 +82,8 @@ export function createClackPrompter(): Prompter {
         ...(trimmedShort.length > 0 ? { short_description: trimmedShort } : {}),
         ...(trimmedDescription.length > 0 ? { description: trimmedDescription } : {}),
         version: version.trim(),
-        tags: parseTagsInput(tagsRaw),
-        category_slugs: parseTagsInput(categoriesRaw),
+        tags: parseTagsInput(tagsRaw ?? ''),
+        category_slugs: parseTagsInput(categoriesRaw ?? ''),
         framework_slugs: [...defaults.framework_slugs],
         ...(trimmedAuthor.length > 0 ? { author_name: trimmedAuthor } : {}),
         tier: defaults.tier,

@@ -16,7 +16,7 @@
 //     the prompts layer
 //
 // What we DO NOT emit:
-//   - `bio` / `knowledge` / `extra_instructions` — those live in the
+//   - `personality` / `vibe` / `knowledge_seed` — those live in the
 //     agent-evolved markdown and require an explicit user decision
 //   - `settings.secrets` / hardware / FKs — never templatable
 //   - `steps` — only used by hand-authored advanced templates
@@ -49,8 +49,9 @@ export interface GraftDocument {
 }
 
 export interface GraftDefaults {
-  bio?: string[];
-  knowledge?: string[];
+  personality?: string;
+  vibe?: string;
+  knowledge_seed?: string[];
   channels?: string[];
   settings?: {
     model?: string;
@@ -62,6 +63,19 @@ export interface GraftDefaults {
 // Field shape is intentionally `unknown`-ish: this builder never
 // produces any, but the type is exported so future iterations can
 // extend the document without re-declaring it.
+//
+// Authors may declare these keys per field (validated by the backend):
+//   id, label, type, required, placeholder, help, default, options,
+//   binding, owned_by, placement, validation, visible_when, required_when,
+//   materialize.
+//
+// `materialize` (only on `type: secret` with `binding: settings.secrets.<KEY>`)
+// is consumed by the launcher at agent boot to convert the stored secret
+// into either a credential file or a one-shot setup command. Two shapes:
+//   { type: "file",    path: "~/.config/foo/key", mode?: "0600", template?: "..." }
+//   { type: "command", run: ["gh","auth","login","--with-token"], stdin?: "{{value}}", timeout_ms?: 30000 }
+// The `{{value}}` placeholder expands to the secret value in `template`,
+// `stdin`, and each `run` argv token.
 export type GraftField = Record<string, unknown>;
 
 export function buildGraftFromOpenclaw(summary: OpenclawAgentSummary): GraftDocument {

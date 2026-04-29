@@ -9,6 +9,7 @@
 //   ├── README.md                   ← author-facing scaffold guide
 //   ├── metadata.json
 //   ├── schema.json
+//   ├── install.sh                  ← OPTIONAL; runs once on first apply
 //   └── skills/
 //       ├── <name>.tar.gz             ← raw skill folder
 //       ├── <name>.manifest.json      ← parsed SKILL.md frontmatter, normalised
@@ -20,6 +21,13 @@
 // PHP from the SKILL.md parsing chain entirely. Future framework
 // launchers (Paperclip, Hermes…) emit the same manifest shape; the
 // backend doesn't care.
+//
+// `install.sh` is the GRAFT-author hook for **runtime dependency setup**
+// that can't be expressed declaratively (e.g. installing a CLI binary
+// the bundled skill needs). The launcher executes it exactly once, on
+// first apply, with a generous timeout. See openclaw-launcher
+// `graft-apply.ts` for the runtime contract. Authors who only need
+// secret materialisation should use `fields[].materialize` instead.
 //
 // We deliberately don't include icon/cover here — those are unversioned
 // per gene-seed/internal/roadmap/grafts-marketplace.md §0.3 and are
@@ -39,7 +47,7 @@ import type { Readable } from 'node:stream';
 import { buildSkillManifest, listInstalledSkills, tarSkillBundle } from '../openclaw/skills.js';
 import type { GraftDocument } from './build.js';
 import type { GraftMetadata } from './package.js';
-import { augmentSchemaWithMechanicalFields, extractChannels } from './scaffoldFields.js';
+import { augmentSchemaWithMechanicalFields } from './scaffoldFields.js';
 
 export interface BuildGraftBundleInput {
   /** Absolute path to the OpenClaw workspace root. */
@@ -78,20 +86,16 @@ export async function buildGraftBundle(
 
   let skillCount = 0;
   try {
-    // List skills up front: their manifests feed both the per-skill
-    // tarballs AND the mechanical `fields[]` derivation that augments
-    // the schema. Doing this once keeps everything consistent.
+    // List skills up front for the per-skill tarballs below. Each skill
+    // also gets a sidecar `<name>.manifest.json` so the backend never
+    // needs to crack open the archive at apply time (§0.4.5).
     const { skills } = await listInstalledSkills(workspacePath);
     const skillManifests = skills.map((s) => buildSkillManifest(s));
 
-    // Augment the schema with mechanical `fields[]` (skill secrets +
-    // channel secrets). Idempotent: if the caller already declared a
-    // field with the same id we leave it alone, so re-bundling an
-    // already-edited schema is a no-op for the derived part.
-    const augmentedSchema = augmentSchemaWithMechanicalFields(schema, {
-      skillManifests,
-      channels: extractChannels(schema),
-    });
+    // Augment the schema with mechanical `fields[]` (materialize
+    // enrichment for known env keys). Idempotent: re-bundling an
+    // already-augmented schema is a no-op.
+    const augmentedSchema = augmentSchemaWithMechanicalFields(schema);
 
     // Top-level documents.
     await fs.writeFile(
@@ -119,6 +123,16 @@ export async function buildGraftBundle(
     // tool notes (CLIs, env vars, hosts…) alongside the skills that need
     // them. Skipped silently when the workspace doesn't have the file.
     await copyManagedDocsIntoBundle(workspacePath, stageDir);
+
+    // Optional first-apply install hook. The launcher runs this exactly
+    // once on first apply (cached via the `.graft-applied` marker) so
+    // the GRAFT can install any binary its bundled skills depend on
+    // (e.g. `gh` CLI for a GitHub skill). Use `fields[].materialize`
+    // for secret-shape conversion; use `install.sh` for binary/runtime
+    // setup. The agent can also self-install missing tools at chat
+    // time (see launcher AGENTS.md template) — install.sh is the
+    // zero-touch path so the first user message just works.
+    await copyInstallScriptIntoBundle(workspacePath, stageDir);
 
     // Skills directory — only created if the workspace has any. An empty
     // `skills/` would round-trip fine but is noise on the wire.
@@ -244,6 +258,39 @@ async function copyManagedDocsIntoBundle(
 }
 
 /**
+ * Optional first-apply hook. If the author keeps a top-level
+ * `install.sh` in their workspace, copy it into the bundle root with
+ * its mode preserved (so the executable bit survives the tar/untar
+ * round-trip). The launcher runs it once on first apply; see
+ * `openclaw-launcher/src/openclaw/graft-apply.ts` for the runtime
+ * contract (timeout, working directory, env exposure).
+ *
+ * No-op when the file is absent — the hook is opt-in.
+ */
+const INSTALL_SCRIPT_FILENAME = 'install.sh';
+
+async function copyInstallScriptIntoBundle(
+  workspacePath: string,
+  stageDir: string,
+): Promise<void> {
+  const src = path.join(workspacePath, INSTALL_SCRIPT_FILENAME);
+  let body: string;
+  let srcStat: Awaited<ReturnType<typeof fs.stat>>;
+  try {
+    [body, srcStat] = await Promise.all([fs.readFile(src, 'utf8'), fs.stat(src)]);
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return;
+    throw err;
+  }
+  const dest = path.join(stageDir, INSTALL_SCRIPT_FILENAME);
+  await fs.writeFile(dest, body, 'utf8');
+  // Preserve executable bit; force at least 0o755 so the launcher can
+  // exec it even if the author forgot `chmod +x`.
+  const mode = (srcStat.mode & 0o777) | 0o755;
+  await fs.chmod(dest, mode);
+}
+
+/**
  * Render the scaffold's `README.md`. This is the single doc the author
  * will see when they open the downloaded `.tar.gz` — it has to be enough
  * to get them from "I have a bundle" to "I pushed a working GRAFT".
@@ -269,6 +316,7 @@ ${slug}-${version}/
 ├── metadata.json          ← marketplace-facing fields (name, slug, tags, …)
 ├── schema.json            ← agent definition + opt-in user inputs (\`fields[]\`)
 ├── TOOLS.md               ← optional; injected into the agent's TOOLS.md
+├── install.sh             ← optional; runs once on first apply (binary setup)
 └── skills/
     ├── <name>.tar.gz      ← raw skill folder (one per installed skill)
     └── <name>.manifest.json
@@ -314,9 +362,59 @@ can derive without guessing:
 
 - One \`secret\` field per skill that declares a \`primary_env\` in its manifest.
 - One \`secret\` field per channel that needs a token (e.g. Telegram).
+- A \`materialize\` block on well-known secrets (e.g. \`GITHUB_TOKEN\` runs
+  \`gh auth login --with-token\` at agent boot, so the user never has to set
+  up the CLI by hand).
 
 Free-text variables (\`{{topic}}\`, \`{{tone}}\`, \`{{audience}}\` …) are **your job**
 — the export tool deliberately doesn't try to invent them from prose.
+
+## \`materialize\` — turn a secret into a usable credential
+
+A \`secret\` field's value is just a string until something puts it where the
+skill expects it. Add a \`materialize\` block to the field to tell the launcher
+how to do that at boot. Two shapes:
+
+**File** — write the secret to disk (e.g. \`~/.aws/credentials\`,
+\`~/.config/notion/api_key\`):
+
+\`\`\`json
+{
+  "id": "notion_api_key",
+  "type": "secret",
+  "binding": "settings.secrets.NOTION_API_KEY",
+  "materialize": {
+    "type": "file",
+    "path": "~/.config/notion/api_key",
+    "mode": "0600",
+    "template": "{{value}}"
+  }
+}
+\`\`\`
+
+**Command** — run a one-shot setup that consumes the secret via stdin
+(e.g. \`gh auth login --with-token\`):
+
+\`\`\`json
+{
+  "id": "github_token",
+  "type": "secret",
+  "binding": "settings.secrets.GITHUB_TOKEN",
+  "materialize": {
+    "type": "command",
+    "run": ["gh", "auth", "login", "--hostname", "github.com",
+            "--git-protocol", "https", "--with-token"],
+    "stdin": "{{value}}",
+    "timeout_ms": 15000
+  }
+}
+\`\`\`
+
+The \`{{value}}\` placeholder expands to the secret value in \`template\`,
+\`stdin\`, and each \`run\` argv token. \`materialize\` is only valid on \`type:
+secret\` fields whose binding starts with \`settings.secrets.\`. The launcher
+re-runs every materialize spec on \`reload-config\`, so secret rotations
+propagate without a container restart.
 
 ## Optional: \`TOOLS.md\`
 

@@ -1,150 +1,120 @@
 // Mechanical `fields[]` derivation for the "Download GRAFT scaffolding"
 // flow (grafts-marketplace.md §3.6.2 — Control A).
 //
-// The export tool deliberately doesn't try to invent free-text variables
-// from prose — that's the author's job, in their editor. But there's a
-// well-defined subset of `fields[]` whose binding is purely mechanical
-// and which the launcher *can* derive without guessing:
+// Design intent: secrets and runtime variables are **declared by the
+// graft author** in `schema.fields[]`. The CLI does NOT try to invent
+// fields by reading skill metadata or by deriving channel tokens — the
+// platform already collects channel tokens (e.g. `TELEGRAM_BOT_TOKEN`)
+// in the channel's own wizard panel, so deriving them here would cause
+// duplicate inputs in the install wizard.
 //
-//   1. **Skill secrets.** Every installed skill that declares a
-//      `primary_env` in its SKILL.md frontmatter needs that env var to
-//      be supplied by whoever applies the GRAFT. We emit a `secret`-type
-//      field bound to `settings.secrets.<KEY>`, one per skill.
+// What the CLI still does mechanically, because the binding is
+// unambiguous and we own the contract:
 //
-//   2. **Channel secrets.** Each channel in `defaults.channels[]` has a
-//      known set of required tokens (Telegram → `TELEGRAM_BOT_TOKEN`).
-//      Same `secret` shape, same `settings.secrets.<KEY>` binding.
+//   * **Materialize enrichment.** When an author-declared `secret`
+//     field's binding env key matches a well-known recipe in
+//     `KNOWN_MATERIALIZERS`, we attach the `materialize` block so the
+//     launcher can wire the credential at agent boot (see
+//     `openclaw-launcher/src/utils/materialize.ts`). Authors can
+//     override by declaring `materialize` themselves.
 //
-// In both cases the derivation is idempotent: if the caller already
-// declared a field with the same `id`, we keep theirs and skip the
-// derived one. That makes re-bundling an already-edited schema safe.
+// The augmentation is idempotent: re-running it on an already-augmented
+// schema is a no-op.
 
 import type { GraftDocument, GraftField } from './build.js';
-import type { SkillManifestJson } from '../openclaw/skills.js';
 
 /**
- * Mapping from channel slug → list of secret env keys that channel needs
- * at runtime. Mirrors the launcher's per-channel wiring in
- * `openclaw-launcher/src/openclaw/generator.ts`.
+ * Per-secret "how do I make this credential usable" recipes that the
+ * launcher can execute at agent boot (see
+ * `openclaw-launcher/src/utils/materialize.ts`). When a secret field's
+ * binding matches one of these env keys, we pre-fill the matching
+ * `materialize` block so the resulting GRAFT is zero-touch: the user
+ * pastes the token in the wizard, the launcher does the rest.
  *
- * Adding a channel to `ALLOWED_GRAFT_CHANNELS` (build.ts) MUST be paired
- * with an entry here so the scaffold generator knows what to ask for.
- */
-const CHANNEL_REQUIRED_SECRETS: Readonly<Record<string, readonly string[]>> = {
-  telegram: ['TELEGRAM_BOT_TOKEN'],
-};
-
-export interface ScaffoldFieldInputs {
-  skillManifests: ReadonlyArray<SkillManifestJson>;
-  channels: ReadonlyArray<string>;
-}
-
-/**
- * Convert an env-var key (e.g. `TELEGRAM_BOT_TOKEN`) into the lowercase
- * snake_case `id` used in the GRAFT schema (e.g. `telegram_bot_token`).
- * Mirrors the convention used in the seeded GRAFTs.
- */
-function envKeyToFieldId(key: string): string {
-  return key.toLowerCase();
-}
-
-function humanizeKey(key: string): string {
-  return key
-    .toLowerCase()
-    .split('_')
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(' ');
-}
-
-/**
- * Build a single `secret`-type field bound to `settings.secrets.<KEY>`.
- * `provenance` shapes the `help` text so the author can tell at a glance
- * which derivation produced the field.
- */
-function buildSecretField(
-  envKey: string,
-  provenance: { kind: 'skill' | 'channel'; name: string },
-): GraftField {
-  const help =
-    provenance.kind === 'skill'
-      ? `Required by the "${provenance.name}" skill (its primary_env).`
-      : `Required to run the "${provenance.name}" channel.`;
-  return {
-    id: envKeyToFieldId(envKey),
-    label: humanizeKey(envKey),
-    type: 'secret',
-    required: true,
-    binding: `settings.secrets.${envKey}`,
-    help,
-  };
-}
-
-/**
- * Derive the mechanical `fields[]` entries for a scaffold from the
- * installed skills' manifests and the channels declared in the schema.
+ * Keep this list minimal — every entry here is a contract: the launcher
+ * MUST be able to run the recipe in the agent container (i.e. the bin
+ * MUST be present). Add a new entry only after you've verified the
+ * end-to-end flow with a real skill.
  *
- * Pure: no IO, no defaults beyond `id` deduplication. Exported so it can
- * be unit-tested in isolation from the bundle pipeline.
+ * Authors can always override or add `materialize` blocks by hand in
+ * `schema.json`; this registry only fills in the blank when the field
+ * doesn't already have one.
+ *
+ * Note on GITHUB_TOKEN: deliberately NOT in this list. The `gh` CLI
+ * reads `$GITHUB_TOKEN` natively, and the launcher already injects
+ * `settings.secrets.*` into the OpenClaw gateway environment. A
+ * `gh auth login --with-token` materializer would also fail because
+ * the launcher base image is intentionally minimal (no `gh` binary).
+ * If a future skill genuinely needs a setup command, add it here AND
+ * make sure the binary is either pre-installed in the launcher image
+ * or installed by the agent at boot.
  */
-export function deriveScaffoldFields(inputs: ScaffoldFieldInputs): GraftField[] {
-  const out: GraftField[] = [];
-  const seenIds = new Set<string>();
+const KNOWN_MATERIALIZERS: Readonly<Record<string, GraftField['materialize']>> = {};
 
-  // Skill secrets first — they're the most likely to need explicit
-  // attention from the author (different skills, different keys).
-  for (const manifest of inputs.skillManifests) {
-    if (!manifest.primary_env || manifest.primary_env.length === 0) continue;
-    const id = envKeyToFieldId(manifest.primary_env);
-    if (seenIds.has(id)) continue;
-    seenIds.add(id);
-    out.push(buildSecretField(manifest.primary_env, { kind: 'skill', name: manifest.name }));
-  }
+/**
+ * Inputs for `augmentSchemaWithMechanicalFields`. Currently empty in
+ * shape, kept as a struct so future mechanical inputs (extraction
+ * targets, framework hints) can be added without churning the call
+ * sites.
+ */
+// eslint-disable-next-line @typescript-eslint/no-empty-interface
+export interface ScaffoldFieldInputs {}
 
-  // Channel secrets next.
-  for (const channel of inputs.channels) {
-    const requiredKeys = CHANNEL_REQUIRED_SECRETS[channel];
-    if (!requiredKeys) continue;
-    for (const envKey of requiredKeys) {
-      const id = envKeyToFieldId(envKey);
-      if (seenIds.has(id)) continue;
-      seenIds.add(id);
-      out.push(buildSecretField(envKey, { kind: 'channel', name: channel }));
-    }
-  }
-
-  return out;
+/**
+ * Extract the env-key portion of a `settings.secrets.<KEY>` binding, or
+ * `null` if the field's binding doesn't match that shape. Used to look
+ * up materialize recipes for author-declared secret fields.
+ */
+function extractSecretEnvKey(field: GraftField): string | null {
+  if (field.type !== 'secret') return null;
+  const binding = typeof field.binding === 'string' ? field.binding : '';
+  const prefix = 'settings.secrets.';
+  if (!binding.startsWith(prefix)) return null;
+  const key = binding.slice(prefix.length);
+  return key.length > 0 ? key : null;
 }
 
 /**
- * Return a shallow-cloned schema whose `fields[]` includes the mechanical
- * derivations from `inputs` AFTER any author-declared fields. Author
- * fields take precedence on `id` collisions — the derivation only adds
- * what's missing.
+ * Attach a `materialize` block to a field when its binding env key has
+ * a known recipe and the author hasn't already declared one. Returns a
+ * new field (does not mutate) if enrichment applies, otherwise returns
+ * the input unchanged.
+ */
+function enrichWithMaterialize(field: GraftField): GraftField {
+  if (field.materialize !== undefined) return field;
+  const envKey = extractSecretEnvKey(field);
+  if (envKey === null) return field;
+  const recipe = KNOWN_MATERIALIZERS[envKey];
+  if (!recipe) return field;
+  return { ...field, materialize: recipe };
+}
+
+/**
+ * Return a shallow-cloned schema whose `fields[]` is the author-declared
+ * list with `materialize` blocks attached for any field whose binding
+ * env key has a known recipe. Author-declared `materialize` blocks are
+ * preserved as-is.
  */
 export function augmentSchemaWithMechanicalFields(
   schema: GraftDocument,
-  inputs: ScaffoldFieldInputs,
+  _inputs: ScaffoldFieldInputs = {},
 ): GraftDocument {
   const existing = Array.isArray(schema.fields) ? schema.fields : [];
-  const existingIds = new Set(
-    existing
-      .map((f) => (f && typeof f === 'object' && typeof f.id === 'string' ? f.id : null))
-      .filter((id): id is string => id !== null),
-  );
-  const derived = deriveScaffoldFields(inputs).filter(
-    (f) => typeof f.id === 'string' && !existingIds.has(f.id),
+  const enriched = existing.map((f) =>
+    f && typeof f === 'object' ? enrichWithMaterialize(f) : f,
   );
   return {
     ...schema,
-    fields: [...existing, ...derived],
+    fields: enriched,
   };
 }
 
 /**
  * Pull the channel slug list out of `schema.defaults.channels` if it
  * exists and is an array of strings. Returns `[]` otherwise — never
- * throws. The schema's deep shape is `unknown` to graft-cli, so we
- * defend against the obvious malformed cases.
+ * throws. Kept here (rather than removed) because callers still need to
+ * inspect declared channels for unrelated bookkeeping; not used by the
+ * augmenter itself anymore.
  */
 export function extractChannels(schema: GraftDocument): string[] {
   const channels = schema.defaults?.channels;
