@@ -1,8 +1,9 @@
 // Sidecar markdown loader.
 //
-// At authoring time the scaffold contains markdown sidecar files
-// (SOUL.md, IDENTITY.md, AGENTS.md, …) named after the source framework.
-// `validate` and `pack` read those files, inline their contents into the
+// At authoring time the scaffold contains markdown sidecar files named
+// after their wizard field (personality.md, vibe.md,
+// extra_instructions.md). `validate` and `pack` read those files, strip
+// any leading instructional HTML comment, inline their contents into the
 // GRAFT `defaults` (under the dot-path declared by the framework
 // mapping), and hand the resulting envelope to the backend / bundler.
 //
@@ -75,9 +76,25 @@ async function readSidecar(absPath: string): Promise<string | undefined> {
   } catch {
     return undefined;
   }
-  const trimmed = raw.trim();
-  if (trimmed.length === 0) return undefined;
-  return trimmed;
+  const stripped = stripLeadingInstructionComment(raw).trim();
+  if (stripped.length === 0) return undefined;
+  return stripped;
+}
+
+/**
+ * Remove the instructional HTML comment that `copyWorkspaceSidecars`
+ * prepends to each sidecar. This is a safety net for authors who forget
+ * to delete it — the comment must never end up in the GRAFT defaults.
+ *
+ * Only strips a comment that starts on the very first line; any other
+ * HTML comment inside the body is left untouched.
+ */
+function stripLeadingInstructionComment(content: string): string {
+  const trimmedStart = content.trimStart();
+  if (!trimmedStart.startsWith('<!--')) return content;
+  const closeIdx = trimmedStart.indexOf('-->');
+  if (closeIdx === -1) return content;
+  return trimmedStart.slice(closeIdx + 3);
 }
 
 /**
@@ -105,33 +122,44 @@ function setByDotPath(target: Record<string, unknown>, pathStr: string, value: s
 }
 
 /**
- * For `init`: copy each mapped markdown file from the source workspace
- * into the scaffold dir, preserving the original filename. Files that
- * don't exist in the workspace are skipped; missing ones are returned
- * so the caller can prompt the user about creating blank stubs.
+ * For `init`: create a stub sidecar file in the scaffold dir for each
+ * mapped field. The stub contains only an instructional HTML comment so
+ * the author knows which framework file the field maps to; they must
+ * write the template content themselves.
+ *
+ * Intentionally does NOT copy workspace content — copying verbatim text
+ * from a live agent would duplicate it when the GRAFT is later applied
+ * (the framework combines personality + extra_instructions into SOUL.md,
+ * so pre-filled defaults would appear twice).
  */
 export async function copyWorkspaceSidecars(
-  workspaceDir: string,
+  _workspaceDir: string,
   scaffoldDir: string,
   framework: FrameworkSlug,
-): Promise<{ copied: string[]; missingInWorkspace: string[] }> {
+): Promise<{ created: string[] }> {
   const mapping = mappingFor(framework);
-  const copied: string[] = [];
-  const missingInWorkspace: string[] = [];
+  const created: string[] = [];
 
   for (const entry of mapping) {
-    const src = path.join(workspaceDir, entry.filename);
     const dst = path.join(scaffoldDir, entry.filename);
-    try {
-      const data = await fs.readFile(src, 'utf8');
-      await fs.writeFile(dst, data, 'utf8');
-      copied.push(entry.filename);
-    } catch {
-      missingInWorkspace.push(entry.filename);
-    }
+    const comment = buildInstructionComment(entry.workspaceFilename);
+    await fs.writeFile(dst, comment, 'utf8');
+    created.push(entry.filename);
   }
 
-  return { copied, missingInWorkspace };
+  return { created };
+}
+
+/**
+ * Build the instructional comment prepended to each scaffold sidecar.
+ * The comment tells the author which framework file the content maps to
+ * and reminds them to remove it before pushing.
+ */
+function buildInstructionComment(workspaceFilename: string): string {
+  return (
+    `<!-- The content of this file will be added to ${workspaceFilename}. ` +
+    `Delete this comment before pushing your GRAFT. -->\n`
+  );
 }
 
 /**

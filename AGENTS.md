@@ -25,8 +25,8 @@
 | `src/cli.ts` | Commander program, all four commands (`init`, `validate`, `pack`, `push`), shared helpers (`resolveApiKey`, `loadScaffold`, `reportValidation`) |
 | `src/index.ts` | Programmatic entry point; re-exports safe, side-effect-free APIs; reads `VERSION` from `package.json` at load |
 | `src/config.ts` | Exports `API_BASE_URL` — defaults to `https://api.guayaba.run/api/v1`, overridable via `$GUAYABA_API_BASE_URL` |
-| `src/framework/mapping.ts` | Static registry: `FrameworkSlug` (`'openclaw'`), `FRAMEWORK_MAPPINGS`, sidecar filename → `defaults` dot-path table |
-| `src/framework/sidecars.ts` | `inlineSidecars` (reads sidecars → inlines into schema), `copyWorkspaceSidecars`, `copyWorkspaceSkills` (also copies `TOOLS.md` and `install.sh`) |
+| `src/framework/mapping.ts` | Static registry: `FrameworkSlug` (`'openclaw'`), `FRAMEWORK_MAPPINGS`, scaffold filename (`personality.md` etc.) + workspace filename (`SOUL.md` etc.) → `defaults` dot-path table |
+| `src/framework/sidecars.ts` | `inlineSidecars` (reads scaffold sidecars, strips leading instruction comment if present, inlines into schema), `copyWorkspaceSidecars` (creates stub files with instruction comment only — does NOT copy workspace content to avoid duplication on apply), `copyWorkspaceSkills` (also copies `TOOLS.md` and `install.sh`) |
 | `src/graft/build.ts` | Pure builder: OpenClaw summary → `GraftDocument` (`schema_version: 2`); defines `ALLOWED_GRAFT_CHANNELS` |
 | `src/graft/bundle.ts` | Assembles `graft.tar.gz` via `tar` child process; stages files in a `os.tmpdir()` tempdir; writes `metadata.json`, `schema.json`, `README.md`, optional `TOOLS.md`, optional `install.sh`, and per-skill `<name>.tar.gz` + `<name>.manifest.json` |
 | `src/graft/scaffoldFields.ts` | `augmentSchemaWithMechanicalFields` — attaches `materialize` blocks to `secret` fields whose `binding` env key has a known recipe; `KNOWN_MATERIALIZERS` is currently empty `{}` |
@@ -43,7 +43,7 @@
 
 | Command | What it does | API key required? | API endpoints called |
 |---|---|---|---|
-| `graft init --framework <slug> [-w <workspace>] [-o <out>]` | Read workspace, build `graft.json` + copy sidecars/skills into scaffold dir. Interactive in TTY (prompts for metadata, stub creation). | No | None |
+| `graft init --framework <slug> [-w <workspace>] [-o <out>]` | Read workspace, build `graft.json` + create blank sidecar stubs (instruction comment only) + copy skills into scaffold dir. Interactive in TTY (prompts for metadata). | No | None |
 | `graft validate --framework <slug> [-i <scaffold>]` | Inline sidecars into schema, POST to backend for validation. | **Yes** (`$GUAYABA_API_KEY` or TTY prompt) | `POST /grafts/validate` |
 | `graft pack --framework <slug> [-i <scaffold>] [-o <out>] [-f]` | Inline sidecars, build `graft.tar.gz` locally. No upload. | No | None |
 | `graft push --framework <slug> [-i <scaffold>] [--icon <path>] [--cover <path>]` | Inline sidecars, upload icon/cover (if provided), build and POST bundle to backend. | **Yes** | `POST /grafts/{slug}/assets/icon`, `POST /grafts/{slug}/assets/cover`, `POST /grafts` |

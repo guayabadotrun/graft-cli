@@ -1,12 +1,14 @@
 // Framework → GRAFT field mapping registry.
 //
-// Each supported framework declares which on-disk markdown files (in the
-// agent workspace AND in the scaffold the dev edits) carry which GRAFT
-// schema field.
+// Each supported framework declares which on-disk markdown files carry
+// which GRAFT schema field.
 //
-// Files keep their original framework name (SOUL.md, IDENTITY.md, ...)
-// so the dev sees something familiar in the scaffold. The CLI does the
-// mapping internally at validate/pack time.
+// `filename`          — the file as it appears in the GRAFT scaffold (the
+//                       dev edits this). Named after the wizard field so
+//                       the purpose is obvious at a glance.
+// `workspaceFilename` — the corresponding file in the agent workspace
+//                       (framework-native name). Used by `graft init` to
+//                       copy the existing content as a starting point.
 //
 // The schema field path is dot-notation: `personality` is top-level,
 // `settings.extra_instructions` is nested.
@@ -14,8 +16,10 @@
 export type FrameworkSlug = 'openclaw';
 
 export interface FieldMapping {
-  /** Workspace-relative filename (e.g. 'SOUL.md'). */
+  /** Scaffold filename (wizard-field name, e.g. 'personality.md'). */
   filename: string;
+  /** Source file in the agent workspace (framework name, e.g. 'SOUL.md'). */
+  workspaceFilename: string;
   /** Dot-path inside the GRAFT `defaults` object. */
   schemaField: string;
 }
@@ -28,9 +32,9 @@ export interface FieldMapping {
  */
 export const FRAMEWORK_MAPPINGS: Record<FrameworkSlug, ReadonlyArray<FieldMapping>> = {
   openclaw: [
-    { filename: 'SOUL.md', schemaField: 'personality' },
-    { filename: 'IDENTITY.md', schemaField: 'vibe' },
-    { filename: 'AGENTS.md', schemaField: 'settings.extra_instructions' },
+    { filename: 'personality.md',         workspaceFilename: 'SOUL.md',     schemaField: 'personality' },
+    { filename: 'vibe.md',                workspaceFilename: 'IDENTITY.md', schemaField: 'vibe' },
+    { filename: 'extra_instructions.md',  workspaceFilename: 'AGENTS.md',   schemaField: 'settings.extra_instructions' },
   ],
 };
 

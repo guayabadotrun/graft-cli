@@ -175,7 +175,7 @@ program
 program
   .command('init')
   .description(
-    'Create a GRAFT scaffold directory: graft.json plus markdown sidecars copied from the source workspace (e.g. SOUL.md, IDENTITY.md, AGENTS.md).',
+    'Create a GRAFT scaffold directory: graft.json plus blank markdown sidecar stubs for you to fill in.',
   )
   .requiredOption(
     '--framework <slug>',
@@ -257,8 +257,9 @@ program
         metadata = meta;
       }
 
-      // 5) Copy markdown sidecars from the workspace.
-      const { copied, missingInWorkspace } = await copyWorkspaceSidecars(
+      // 5) Create blank sidecar stubs (instruction comment only — no content
+      //    is copied from the workspace to avoid duplication when applied).
+      const { created: createdSidecars } = await copyWorkspaceSidecars(
         workspacePath,
         scaffoldDir,
         framework,
@@ -282,22 +283,7 @@ program
         process.exit(1);
       }
 
-      // 6) For files missing in the workspace, optionally create blank stubs.
-      const stubsCreated: string[] = [];
-      if (missingInWorkspace.length > 0 && interactive) {
-        const wantStubs = await confirm({
-          message: `These sidecars don't exist in the workspace: ${missingInWorkspace.join(', ')}. Create empty stubs in the scaffold so you can fill them in by hand?`,
-          initialValue: true,
-        });
-        if (!isCancel(wantStubs) && wantStubs === true) {
-          for (const filename of missingInWorkspace) {
-            await writeFile(resolve(scaffoldDir, filename), '', 'utf8');
-            stubsCreated.push(filename);
-          }
-        }
-      }
-
-      // 7) Write graft.json last so the scaffold is consistent if the
+      // 6) Write graft.json last so the scaffold is consistent if the
       //    user Ctrl-Cs midway.
       const pkg: GraftPackage = { metadata, schema: doc };
       await writeFile(
@@ -320,10 +306,7 @@ program
       console.log('');
       console.log('Files:');
       console.log('  graft.json          ← main file: edit metadata + schema fields here');
-      for (const f of copied) console.log(`  ${f} (copied from workspace)`);
-      for (const f of stubsCreated) console.log(`  ${f} (empty stub)`);
-      const skipped = missingInWorkspace.filter((f) => !stubsCreated.includes(f));
-      for (const f of skipped) console.log(`  ${f} (missing — schema field will stay empty)`);
+      for (const f of createdSidecars) console.log(`  ${f} (stub — fill in before pushing)`);
       if (copiedSkills.length > 0) {
         console.log(`  skills/ (${copiedSkills.length} skill${copiedSkills.length === 1 ? '' : 's'}: ${copiedSkills.join(', ')})`);
       }
@@ -332,9 +315,8 @@ program
       console.log('');
       console.log('Next steps:');
       console.log(`  1. Open graft.json — review and update metadata (name, slug, description, version) and schema fields.`);
-      const sidecarList = [...copied, ...stubsCreated];
-      if (sidecarList.length > 0) {
-        console.log(`  2. Edit the sidecars (${sidecarList.join(', ')}) to match your agent's personality.`);
+      if (createdSidecars.length > 0) {
+        console.log(`  2. Edit the sidecars (${createdSidecars.join(', ')}) — replace the placeholder comment with your template content.`);
         console.log(`  3. Run: graft validate --framework ${framework}`);
       } else {
         console.log(`  2. Run: graft validate --framework ${framework}`);

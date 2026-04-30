@@ -18,12 +18,20 @@ describe('framework mapping registry', () => {
     expect(isSupportedFramework(undefined)).toBe(false);
   });
 
-  it('exposes the openclaw → schema field mapping', () => {
+  it('exposes the openclaw → schema field mapping using wizard-field filenames', () => {
     const m = mappingFor('openclaw');
     const byFile = Object.fromEntries(m.map((e) => [e.filename, e.schemaField]));
-    expect(byFile['SOUL.md']).toBe('personality');
-    expect(byFile['IDENTITY.md']).toBe('vibe');
-    expect(byFile['AGENTS.md']).toBe('settings.extra_instructions');
+    expect(byFile['personality.md']).toBe('personality');
+    expect(byFile['vibe.md']).toBe('vibe');
+    expect(byFile['extra_instructions.md']).toBe('settings.extra_instructions');
+  });
+
+  it('retains the original workspace filename for each openclaw mapping', () => {
+    const m = mappingFor('openclaw');
+    const byFile = Object.fromEntries(m.map((e) => [e.filename, e.workspaceFilename]));
+    expect(byFile['personality.md']).toBe('SOUL.md');
+    expect(byFile['vibe.md']).toBe('IDENTITY.md');
+    expect(byFile['extra_instructions.md']).toBe('AGENTS.md');
   });
 
   it('keeps every mapping discoverable from the registry', () => {

@@ -29,9 +29,9 @@ describe('inlineSidecars', () => {
   });
 
   it('inlines all three openclaw sidecars when present', async () => {
-    await writeFile(path.join(dir, 'SOUL.md'), 'You are a helpful assistant.', 'utf8');
-    await writeFile(path.join(dir, 'IDENTITY.md'), 'dry, witty', 'utf8');
-    await writeFile(path.join(dir, 'AGENTS.md'), 'Always cite sources.', 'utf8');
+    await writeFile(path.join(dir, 'personality.md'), 'You are a helpful assistant.', 'utf8');
+    await writeFile(path.join(dir, 'vibe.md'), 'dry, witty', 'utf8');
+    await writeFile(path.join(dir, 'extra_instructions.md'), 'Always cite sources.', 'utf8');
 
     const result = await inlineSidecars(emptyDoc(), dir, 'openclaw');
 
@@ -39,29 +39,47 @@ describe('inlineSidecars', () => {
     expect(result.schema.defaults.vibe).toBe('dry, witty');
     expect(result.schema.defaults.settings?.extra_instructions).toBe('Always cite sources.');
     expect(result.applied.map((a) => a.filename).sort()).toEqual([
-      'AGENTS.md',
-      'IDENTITY.md',
-      'SOUL.md',
+      'extra_instructions.md',
+      'personality.md',
+      'vibe.md',
     ]);
     expect(result.missing).toEqual([]);
   });
 
+  it('strips the leading instructional comment before inlining', async () => {
+    const comment = '<!-- The content of this file will be added to SOUL.md. Delete this comment before pushing your GRAFT. -->\n';
+    await writeFile(path.join(dir, 'personality.md'), comment + 'You are a helpful assistant.', 'utf8');
+
+    const result = await inlineSidecars(emptyDoc(), dir, 'openclaw');
+
+    expect(result.schema.defaults.personality).toBe('You are a helpful assistant.');
+  });
+
   it('reports missing sidecars and leaves their fields untouched', async () => {
-    await writeFile(path.join(dir, 'SOUL.md'), 'just a soul', 'utf8');
+    await writeFile(path.join(dir, 'personality.md'), 'just a soul', 'utf8');
     const result = await inlineSidecars(emptyDoc(), dir, 'openclaw');
 
     expect(result.schema.defaults.personality).toBe('just a soul');
     expect(result.schema.defaults.vibe).toBeUndefined();
     expect(result.schema.defaults.settings).toBeUndefined();
-    expect(result.missing.sort()).toEqual(['AGENTS.md', 'IDENTITY.md']);
+    expect(result.missing.sort()).toEqual(['extra_instructions.md', 'vibe.md']);
   });
 
   it('treats whitespace-only sidecars as missing', async () => {
-    await writeFile(path.join(dir, 'SOUL.md'), '   \n\t\n', 'utf8');
+    await writeFile(path.join(dir, 'personality.md'), '   \n\t\n', 'utf8');
     const result = await inlineSidecars(emptyDoc(), dir, 'openclaw');
 
     expect(result.schema.defaults.personality).toBeUndefined();
-    expect(result.missing).toContain('SOUL.md');
+    expect(result.missing).toContain('personality.md');
+  });
+
+  it('treats a sidecar containing only the instruction comment as missing', async () => {
+    const comment = '<!-- The content of this file will be added to SOUL.md. Delete this comment before pushing your GRAFT. -->';
+    await writeFile(path.join(dir, 'personality.md'), comment, 'utf8');
+    const result = await inlineSidecars(emptyDoc(), dir, 'openclaw');
+
+    expect(result.schema.defaults.personality).toBeUndefined();
+    expect(result.missing).toContain('personality.md');
   });
 
   it('preserves existing defaults that are not overridden by a sidecar', async () => {
@@ -76,14 +94,14 @@ describe('inlineSidecars', () => {
   });
 
   it('does not mutate the input schema', async () => {
-    await writeFile(path.join(dir, 'SOUL.md'), 'hi', 'utf8');
+    await writeFile(path.join(dir, 'personality.md'), 'hi', 'utf8');
     const doc = emptyDoc();
     await inlineSidecars(doc, dir, 'openclaw');
     expect(doc.defaults.personality).toBeUndefined();
   });
 
   it('writes nested dot-paths into defaults.settings', async () => {
-    await writeFile(path.join(dir, 'AGENTS.md'), 'be precise', 'utf8');
+    await writeFile(path.join(dir, 'extra_instructions.md'), 'be precise', 'utf8');
     const result = await inlineSidecars(emptyDoc(), dir, 'openclaw');
     expect(result.schema.defaults.settings).toEqual({ extra_instructions: 'be precise' });
   });
@@ -101,24 +119,36 @@ describe('copyWorkspaceSidecars', () => {
     await rm(scaffold, { recursive: true, force: true });
   });
 
-  it('copies present files and reports missing ones', async () => {
-    await writeFile(path.join(workspace, 'SOUL.md'), 'soul', 'utf8');
-    await writeFile(path.join(workspace, 'IDENTITY.md'), 'id', 'utf8');
-    // AGENTS.md missing on purpose
-
+  it('creates wizard-field stub files for all mapped sidecars regardless of workspace', async () => {
+    // Workspace has no sidecar files at all — stubs are always created
     const result = await copyWorkspaceSidecars(workspace, scaffold, 'openclaw');
 
-    expect(result.copied.sort()).toEqual(['IDENTITY.md', 'SOUL.md']);
-    expect(result.missingInWorkspace).toEqual(['AGENTS.md']);
+    expect(result.created.sort()).toEqual([
+      'extra_instructions.md',
+      'personality.md',
+      'vibe.md',
+    ]);
+  });
+
+  it('each stub contains only the instructional comment (no workspace content)', async () => {
+    // Even if the workspace has content, it must NOT appear in the stub
+    await writeFile(path.join(workspace, 'SOUL.md'), 'soul content', 'utf8');
+
+    await copyWorkspaceSidecars(workspace, scaffold, 'openclaw');
+
+    const { readFile } = await import('node:fs/promises');
+    const written = await readFile(path.join(scaffold, 'personality.md'), 'utf8');
+    expect(written).toMatch(/^<!-- The content of this file will be added to SOUL\.md\./);
+    expect(written).not.toContain('soul content');
   });
 });
 
 describe('sidecarFilenamesFor', () => {
-  it('returns the openclaw sidecar list', () => {
+  it('returns the openclaw scaffold filenames (wizard-field names)', () => {
     expect(sidecarFilenamesFor('openclaw').sort()).toEqual([
-      'AGENTS.md',
-      'IDENTITY.md',
-      'SOUL.md',
+      'extra_instructions.md',
+      'personality.md',
+      'vibe.md',
     ]);
   });
 });

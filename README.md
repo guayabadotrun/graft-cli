@@ -27,10 +27,11 @@ The CLI generates a self-contained **scaffold directory** from your
 agent's workspace. The scaffold contains:
 
 - `graft.json` — declarative schema + marketplace metadata.
-- Markdown sidecars named after the source framework (e.g. `SOUL.md`,
-  `IDENTITY.md`, `AGENTS.md` for openclaw). The dev edits these by
-  hand; the CLI inlines them into the schema's `defaults` at validate
-  / pack / push time.
+- Markdown sidecar stubs named after their wizard field (e.g.
+  `personality.md`, `vibe.md`, `extra_instructions.md` for openclaw).
+  Each stub contains only an instructional comment; the author fills in
+  the template content by hand. The CLI inlines them into the schema's
+  `defaults` at validate / pack / push time.
 - A copy of the workspace's `skills/` directory (and `TOOLS.md` when
   present), so the scaffold is the only input the rest of the
   pipeline needs.
@@ -44,8 +45,8 @@ agent's workspace. The scaffold contains:
 # 1. Generate the scaffold from an existing agent workspace.
 graft init --framework openclaw -w ./my-agent -o ./graft
 
-# 2. Edit the sidecars (./graft/SOUL.md, IDENTITY.md, AGENTS.md) by hand.
-$EDITOR ./graft/SOUL.md
+# 2. Fill in the sidecar stubs with your template content.
+$EDITOR ./graft/personality.md
 
 # 3. Validate against the Guayaba backend.
 graft validate --framework openclaw -i ./graft
@@ -72,8 +73,8 @@ Global flags available on the root `graft` command:
 
 ### `graft init`
 
-Create a scaffold directory: `graft.json` plus markdown sidecars copied
-verbatim from the source workspace.
+Create a scaffold directory: `graft.json`, blank markdown sidecar stubs
+for you to fill in, and a copy of the workspace's skills.
 
 ```
 Required:
@@ -92,9 +93,12 @@ Behaviour:
   Specifying any other channel will cause `init` to exit with an error.
 - Asks for marketplace metadata interactively (slug, name, description,
   version, tags, categories, author).
-- Copies each sidecar from the workspace into the scaffold (e.g.
-  `SOUL.md` → `./graft/SOUL.md`). For sidecars missing in the workspace
-  it offers to create empty stubs.
+- Creates a sidecar stub for each mapped field (`personality.md`,
+  `vibe.md`, `extra_instructions.md` for openclaw). Each stub contains
+  only an instructional HTML comment; the author writes the template
+  content themselves. Workspace content is intentionally not copied —
+  copying verbatim would duplicate the text when the GRAFT is applied,
+  because the framework combines personality and extra_instructions.
 - Copies the workspace's installed skills into `<scaffold>/skills/`,
   flattening `<workspace>/skills/` and `<workspace>/.agents/skills/`
   into a single tree. Also copies `TOOLS.md` if present. The scaffold
@@ -168,15 +172,15 @@ Read from `$GUAYABA_API_KEY` or prompted in a TTY. Agent-scoped keys
 
 ## Framework mapping
 
-Each framework defines a fixed registry of `sidecar filename → schema
-dot-path` entries. The CLI uses it to decide what to copy on `init` and
-where to inline content on `validate`/`pack`/`push`.
+Each framework defines a fixed registry of scaffold sidecar → schema
+field entries. The CLI uses it to create stubs on `init` and to inline
+content on `validate`/`pack`/`push`.
 
-| Framework | Sidecar     | Schema field                  |
-|-----------|-------------|-------------------------------|
-| openclaw  | `SOUL.md`     | `defaults.personality`        |
-| openclaw  | `IDENTITY.md` | `defaults.vibe`               |
-| openclaw  | `AGENTS.md`   | `defaults.settings.extra_instructions` |
+| Framework | Scaffold sidecar          | Maps to (workspace file) | Schema field                           |
+|-----------|---------------------------|--------------------------|----------------------------------------|
+| openclaw  | `personality.md`          | `SOUL.md`                | `defaults.personality`                 |
+| openclaw  | `vibe.md`                 | `IDENTITY.md`            | `defaults.vibe`                        |
+| openclaw  | `extra_instructions.md`   | `AGENTS.md`              | `defaults.settings.extra_instructions` |
 
 Empty / whitespace-only sidecars are treated as absent — the
 corresponding field stays out of `defaults`.
