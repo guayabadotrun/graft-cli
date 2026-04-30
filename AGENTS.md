@@ -32,7 +32,7 @@
 | `src/graft/scaffoldFields.ts` | `augmentSchemaWithMechanicalFields` — attaches `materialize` blocks to `secret` fields whose `binding` env key has a known recipe; `KNOWN_MATERIALIZERS` is currently empty `{}` |
 | `src/graft/package.ts` | `GraftMetadata`, `GraftPackage` interfaces; `KNOWN_CATEGORY_SLUGS` constant |
 | `src/api/validateClient.ts` | `POST /grafts/validate` — auth-gated; returns `{ ok, warnings }` or `{ ok: false, issues }` |
-| `src/api/pushClient.ts` | `POST /grafts` (multipart: `bundle`, `metadata`, `schema`) + `POST /grafts/{slug}/assets/{type}` (method-spoofed `_method=PUT`); uploads icon/cover first, then bundle |
+| `src/api/pushClient.ts` | `POST /grafts` (multipart: `bundle`, `metadata`, `schema`) + `POST /grafts/{slug}/assets/{type}` (plain POST, no method-spoofing); uploads icon/cover first, then bundle |
 | `src/prompts/clack.ts` | Interactive metadata prompts (Clack-based); only called in TTY context during `init` |
 | `src/prompts/types.ts` | `Prompter` and `MetadataResult` interfaces |
 | `src/openclaw/workspace.ts` | Reads an OpenClaw workspace from disk; exports `WorkspaceNotFoundError`, `InvalidOpenclawConfigError` |
@@ -60,7 +60,7 @@ All four commands require `--framework` (currently only `openclaw` is supported)
 - **Slave keys are rejected** — the backend returns HTTP 403 for slave keys on both `POST /grafts` and the asset endpoints. Only master API keys work.
 - **`augmentSchemaWithMechanicalFields` is called in `pushClient.ts` before POSTing** — the form-field `schema` must match the bundle's `schema.json` exactly; the augmentation runs on both code paths.
 - **`KNOWN_MATERIALIZERS` is currently empty** — the scaffolded `materialize` enrichment is wired but no env-key recipes are registered yet. The block in the README doc example (`gh auth login`) was deliberately removed from the registry because the launcher base image doesn't ship `gh`.
-- **Asset uploads use method-spoofing** — Laravel can't parse multipart bodies on native `PUT`; the CLI sends `POST` with `_method=PUT` form field. Do not change to a real `PUT`.
+- **Asset uploads use plain `POST`** — the route accepts both `POST` and `PUT` (`Route::match`). The CLI sends a regular `POST` multipart; no `_method=PUT` field. This avoids PHP `finfo` MIME detection issues that arise when method-spoofing is combined with binary file uploads.
 - **Bundle is drained to a `Buffer` in `pushClient.ts`** — Node's global `fetch` can't compute multipart `Content-Length` from a streaming body; the whole bundle is buffered in memory (backend cap: 200 MB).
 - **Non-interactive re-init is blocked** — `graft init` refuses to overwrite an existing scaffold dir when not in a TTY (`process.stdin.isTTY`).
 - **`schema_version: 2` only** — the backend validator only accepts `schema_version: 2`. The builder always emits it; never change to another value without a backend migration.
@@ -73,8 +73,8 @@ All requests go to `API_BASE_URL` (default `https://api.guayaba.run/api/v1`).
 |---|---|---|---|---|
 | `/grafts/validate` | POST | `Authorization: Bearer <master_key>` | `application/json` | `validate` command |
 | `/grafts` | POST | `Authorization: Bearer <master_key>` | `multipart/form-data` (fields: `metadata` JSON, `schema` JSON, `bundle` tar.gz) | `push` command |
-| `/grafts/{slug}/assets/icon` | POST + `_method=PUT` | `Authorization: Bearer <master_key>` | `multipart/form-data` (fields: `_method=PUT`, `file` Blob) | `push --icon` |
-| `/grafts/{slug}/assets/cover` | POST + `_method=PUT` | `Authorization: Bearer <master_key>` | `multipart/form-data` (fields: `_method=PUT`, `file` Blob) | `push --cover` |
+| `/grafts/{slug}/assets/icon` | POST | `Authorization: Bearer <master_key>` | `multipart/form-data` (field: `file` Blob) | `push --icon` |
+| `/grafts/{slug}/assets/cover` | POST | `Authorization: Bearer <master_key>` | `multipart/form-data` (field: `file` Blob) | `push --cover` |
 
 HTTP outcomes:
 - `validate`: 200 → ok+warnings, 422 → validation issues, 401 → bad key

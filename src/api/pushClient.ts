@@ -147,11 +147,9 @@ async function uploadAsset(
 
   const filename = basename(filePath);
   const form = new FormData();
-  // Laravel doesn't parse multipart bodies on PUT/PATCH/DELETE (PHP itself
-  // only populates `$_FILES` for POST). The framework's standard workaround
-  // is form-method spoofing: POST with a `_method=PUT` field. The route is
-  // still matched as PUT, and `$request->file('file')` works as expected.
-  form.append('_method', 'PUT');
+  // The asset route accepts both PUT (proper REST) and POST (Node.js /
+  // browser FormData). Use plain POST — PHP populates $_FILES for POST
+  // natively and finfo MIME detection works reliably without method-spoofing.
   form.append('file', new Blob([bytes], { type: mimeFor(filename) }), filename);
 
   const url = joinUrl(`/grafts/${encodeURIComponent(slug)}/assets/${type}`);
@@ -172,12 +170,21 @@ async function uploadAsset(
     throw new PushRequestError(`Failed to reach ${url}: ${(err as Error).message}`, err);
   }
 
+  const assetContentType = response.headers.get('content-type') ?? '';
+  if (assetContentType.includes('text/html')) {
+    throw new PushRequestError(
+      `Asset endpoint returned an HTML page (HTTP ${response.status}). ` +
+        'Check that GUAYABA_API_BASE_URL points at the backend API (e.g. http://host:9090/api/v1).',
+    );
+  }
+
   let body: unknown;
   try {
     body = await response.json();
   } catch (err) {
     throw new PushRequestError(
-      `Asset endpoint returned non-JSON response (HTTP ${response.status}).`,
+      `Asset endpoint returned non-JSON response (HTTP ${response.status}). ` +
+        'Check that GUAYABA_API_BASE_URL points at the backend API (e.g. http://host:9090/api/v1).',
       err,
     );
   }
@@ -308,12 +315,23 @@ export async function pushGraftPackage(
     throw new PushRequestError(`Failed to reach ${url}: ${(err as Error).message}`, err);
   }
 
+  const contentType = response.headers.get('content-type') ?? '';
+  if (contentType.includes('text/html')) {
+    throw new PushRequestError(
+      `Push endpoint returned an HTML page (HTTP ${response.status}). ` +
+        'This usually means GUAYABA_API_BASE_URL points at a web frontend or reverse-proxy ' +
+        'rather than the Laravel backend directly. ' +
+        'Set GUAYABA_API_BASE_URL=http://<backend-host>:<port>/api/v1 and retry.',
+    );
+  }
+
   let body: unknown;
   try {
     body = await response.json();
   } catch (err) {
     throw new PushRequestError(
-      `Push endpoint returned non-JSON response (HTTP ${response.status}).`,
+      `Push endpoint returned non-JSON response (HTTP ${response.status}). ` +
+        'Check that GUAYABA_API_BASE_URL points at the backend API (e.g. http://host:9090/api/v1).',
       err,
     );
   }

@@ -99,12 +99,23 @@ export async function validateGraftPackage(
     throw new ValidateRequestError(`Failed to reach ${url}: ${(err as Error).message}`, err);
   }
 
+  const contentType = response.headers.get('content-type') ?? '';
+  if (contentType.includes('text/html')) {
+    throw new ValidateRequestError(
+      `Validate endpoint returned an HTML page (HTTP ${response.status}). ` +
+        'This usually means GUAYABA_API_BASE_URL points at a web frontend or reverse-proxy ' +
+        'rather than the Laravel backend directly. ' +
+        'Set GUAYABA_API_BASE_URL=https://<api-domain>/api/v1 and retry.',
+    );
+  }
+
   let body: unknown;
   try {
     body = await response.json();
   } catch (err) {
     throw new ValidateRequestError(
-      `Validate endpoint returned non-JSON response (HTTP ${response.status}).`,
+      `Validate endpoint returned non-JSON response (HTTP ${response.status}). ` +
+        'Check that GUAYABA_API_BASE_URL points at the backend API (e.g. https://<api-domain>/api/v1).',
       err,
     );
   }
