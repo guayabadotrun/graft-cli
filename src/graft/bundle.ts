@@ -165,8 +165,13 @@ export async function buildGraftBundle(
   }
 
   // Outer `tar -czf - -C <stageDir> .` → stdout stream.
+  // COPYFILE_DISABLE=1 prevents macOS BSD tar from injecting AppleDouble
+  // `._*` sidecar files (resource-fork metadata) into the archive. These
+  // look like `._github.tar.gz` but are not valid gzip — the launcher
+  // would try to extract them and fail. The flag is a no-op on Linux.
   const child = spawn('tar', ['-czf', '-', '-C', stageDir, '.'], {
     stdio: ['ignore', 'pipe', 'pipe'],
+    env: { ...process.env, COPYFILE_DISABLE: '1' },
   });
 
   let stderr = '';

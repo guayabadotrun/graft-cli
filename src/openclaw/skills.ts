@@ -455,8 +455,11 @@ export function tarSkillBundle(skillDir: string): {
   const parent = path.dirname(skillDir);
   const name = path.basename(skillDir);
 
+  // COPYFILE_DISABLE=1 suppresses macOS AppleDouble `._*` sidecar files
+  // inside the per-skill tarball. No-op on Linux.
   const child = spawn('tar', ['-czf', '-', '-C', parent, name], {
     stdio: ['ignore', 'pipe', 'pipe'],
+    env: { ...process.env, COPYFILE_DISABLE: '1' },
   });
 
   let stderr = '';
