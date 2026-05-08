@@ -1,5 +1,5 @@
 // HTTP client for `POST /api/v1/grafts` and
-// `PUT /api/v1/grafts/{slug}/assets/{type}` — pushes a complete,
+// `POST /api/v1/grafts/{slug}/assets/{type}` — pushes a complete,
 // versioned GRAFT bundle (built locally from a workspace) and its optional
 // icon / cover artwork to the author's personal area on the Guayaba backend.
 //

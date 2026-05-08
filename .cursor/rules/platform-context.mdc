@@ -27,13 +27,13 @@ alwaysApply: true
 - Only master API keys work — slave keys get HTTP 403.
 - `augmentSchemaWithMechanicalFields` must be called before POSTing so the form-field `schema` matches the bundled `schema.json`. `KNOWN_MATERIALIZERS` is currently empty `{}`.
 - `schema_version: 2` only — the only value the backend validator accepts.
-- Asset endpoints use method-spoofing: `POST` with `_method=PUT`, not real `PUT`.
+- Asset endpoints use plain multipart `POST`; do not send method-spoofing fields.
 
 ## API endpoints called
 
 - `POST /grafts/validate` — auth required, JSON body
 - `POST /grafts` — multipart (`metadata`, `schema`, `bundle`)
-- `POST /grafts/{slug}/assets/{icon|cover}` — multipart with `_method=PUT`
+- `POST /grafts/{slug}/assets/{icon|cover}` — plain multipart with `file`
 
 
 ## Platform map (all repos)

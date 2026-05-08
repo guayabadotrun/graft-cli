@@ -16,8 +16,9 @@ import type { GraftDocument } from './build.js';
  * `status` is intentionally absent: a freshly exported GRAFT is always
  * a personal graft until the author submits it for marketplace review.
  *
- * `icon_path` / `cover_image_path` are S3 object keys, never URLs. The
- * CLI doesn't upload assets today, so they stay null in v0.x.
+ * `icon_path` / `cover_image_path` are S3 object keys, never URLs. During
+ * `graft push --icon/--cover`, the CLI uploads assets before the bundle and
+ * lets the backend persist the resulting keys.
  */
 export interface GraftMetadata {
   slug: string;

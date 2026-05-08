@@ -60,7 +60,7 @@ All four commands require `--framework` (currently only `openclaw` is supported)
 - **Slave keys are rejected** — the backend returns HTTP 403 for slave keys on both `POST /grafts` and the asset endpoints. Only master API keys work.
 - **`augmentSchemaWithMechanicalFields` is called in `pushClient.ts` before POSTing** — the form-field `schema` must match the bundle's `schema.json` exactly; the augmentation runs on both code paths.
 - **`KNOWN_MATERIALIZERS` is currently empty** — the scaffolded `materialize` enrichment is wired but no env-key recipes are registered yet. The block in the README doc example (`gh auth login`) was deliberately removed from the registry because the launcher base image doesn't ship `gh`.
-- **Asset uploads use plain `POST`** — the route accepts both `POST` and `PUT` (`Route::match`). The CLI sends a regular `POST` multipart; no `_method=PUT` field. This avoids PHP `finfo` MIME detection issues that arise when method-spoofing is combined with binary file uploads.
+- **Asset uploads use plain `POST`** — the route accepts both `POST` and `PUT` (`Route::match`). The CLI sends a regular `POST` multipart without method-spoofing. This avoids PHP `finfo` MIME detection issues that arise when method-spoofing is combined with binary file uploads.
 - **Bundle is drained to a `Buffer` in `pushClient.ts`** — Node's global `fetch` can't compute multipart `Content-Length` from a streaming body; the whole bundle is buffered in memory (backend cap: 200 MB).
 - **Non-interactive re-init is blocked** — `graft init` refuses to overwrite an existing scaffold dir when not in a TTY (`process.stdin.isTTY`).
 - **`schema_version: 2` only** — the backend validator only accepts `schema_version: 2`. The builder always emits it; never change to another value without a backend migration.
@@ -89,8 +89,9 @@ HTTP outcomes:
 
 ## Current known debt / stale comments
 
+See `docs/technical-debt.md` for the tracked list.
+
 - **`src/graft/scaffoldFields.ts` `KNOWN_MATERIALIZERS` is empty** — the comment in `bundle.ts`'s README template still shows `gh auth login` and `materialize` examples as _already templated_, but the registry generates nothing. The README in the tarball describes a feature that doesn't auto-fire yet.
-- **`src/graft/package.ts` `icon_path`/`cover_image_path` comment** — says "CLI doesn't upload assets today", but `push` does support `--icon`/`--cover`. Comment is stale.
 - **`validateClient.ts` JSDoc says `apiKey?` is optional** — this is technically true in the interface, but the backend rejects unauthenticated requests (401). The CLI always passes a key; callers relying on the optional signature for anonymous validation will get a 401.
 - **`src/cli.ts` line 498** — `void appliedSidecars` comment says "Avoid unused-variable warning in environments where sidecar list isn't logged elsewhere" — this is a lint workaround; the sidecars are in fact logged above in the push handler.
 - **`src/index.ts` comment** — "Right now we expose the package version and the OpenClaw workspace reader" — understates what's actually exported (validate/push clients, bundle builder, metadata helpers, etc.).
