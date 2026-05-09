@@ -24,10 +24,10 @@ describe('buildGraftFromOpenclaw', () => {
     expect(doc.framework_constraints).toEqual(['openclaw']);
   });
 
-  it('puts model and thinking under settings (snake_case path per schema spec)', () => {
+  it('puts the model under llm_provider_model and thinking under settings', () => {
     const doc = buildGraftFromOpenclaw(summary());
+    expect(doc.defaults.llm_provider_model).toBe('anthropic/claude-sonnet-4.6');
     expect(doc.defaults.settings).toEqual({
-      model: 'anthropic/claude-sonnet-4.6',
       thinking: 'medium',
     });
   });
@@ -42,16 +42,18 @@ describe('buildGraftFromOpenclaw', () => {
     expect(doc.defaults.channels).toBeUndefined();
   });
 
-  it('omits settings entirely when neither model nor thinking are known', () => {
+  it('omits model and settings when neither model nor thinking are known', () => {
     const doc = buildGraftFromOpenclaw(
       summary({ model: undefined, thinking: undefined }),
     );
+    expect(doc.defaults.llm_provider_model).toBeUndefined();
     expect(doc.defaults.settings).toBeUndefined();
   });
 
-  it('emits settings with only the known keys (model only)', () => {
+  it('emits only llm_provider_model when only the model is known', () => {
     const doc = buildGraftFromOpenclaw(summary({ thinking: undefined }));
-    expect(doc.defaults.settings).toEqual({ model: 'anthropic/claude-sonnet-4.6' });
+    expect(doc.defaults.llm_provider_model).toBe('anthropic/claude-sonnet-4.6');
+    expect(doc.defaults.settings).toBeUndefined();
   });
 
   it('always emits an empty fields array (no custom inputs in the baseline)', () => {

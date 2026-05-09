@@ -10,7 +10,7 @@
 //   - `framework_constraints: ['openclaw']` so the marketplace knows
 //     which frameworks can apply this template
 //   - `defaults` carrying only the keys we could read unambiguously
-//     (channels, settings.model, settings.thinking)
+//     (channels, llm_provider_model, settings.thinking)
 //   - `fields: []` — this baseline has no custom user inputs; richer
 //     templates will be authored by hand or by later iterations of
 //     the prompts layer
@@ -53,8 +53,8 @@ export interface GraftDefaults {
   vibe?: string;
   knowledge_seed?: string[];
   channels?: string[];
+  llm_provider_model?: string;
   settings?: {
-    model?: string;
     thinking?: ThinkingLevel;
     extra_instructions?: string;
   };
@@ -97,7 +97,7 @@ export function buildGraftFromOpenclaw(summary: OpenclawAgentSummary): GraftDocu
 
   const settings: NonNullable<GraftDefaults['settings']> = {};
   if (summary.universal.model !== undefined) {
-    settings.model = summary.universal.model;
+    defaults.llm_provider_model = summary.universal.model;
   }
   if (summary.universal.thinking !== undefined) {
     settings.thinking = summary.universal.thinking;

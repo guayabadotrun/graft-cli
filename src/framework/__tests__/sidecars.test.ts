@@ -85,12 +85,12 @@ describe('inlineSidecars', () => {
   it('preserves existing defaults that are not overridden by a sidecar', async () => {
     const doc = emptyDoc();
     doc.defaults.channels = ['telegram'];
-    doc.defaults.settings = { model: 'anthropic/claude-sonnet-4.6' };
+    doc.defaults.llm_provider_model = 'anthropic/claude-sonnet-4.6';
 
     const result = await inlineSidecars(doc, dir, 'openclaw');
 
     expect(result.schema.defaults.channels).toEqual(['telegram']);
-    expect(result.schema.defaults.settings?.model).toBe('anthropic/claude-sonnet-4.6');
+    expect(result.schema.defaults.llm_provider_model).toBe('anthropic/claude-sonnet-4.6');
   });
 
   it('does not mutate the input schema', async () => {
