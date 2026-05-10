@@ -54,7 +54,7 @@ graft validate --framework openclaw -i ./graft
 # 4. (optional) Pack a tarball locally without uploading.
 graft pack --framework openclaw -i ./graft -o ./graft.tar.gz
 
-# 5. Push to your personal storage on the Guayaba backend.
+# 5. Push to your tenant-scoped personal storage on the Guayaba backend.
 graft push --framework openclaw -i ./graft
 ```
 
@@ -124,7 +124,7 @@ Options:
 The CLI does not pre-validate field caps locally — it defers to the
 backend's 422 response.
 
-Authentication: requires an account **master** API key (`g_master_*`).
+Authentication: requires a tenant-bound **master** API key (`g_master_*`).
 Read from `$GUAYABA_API_KEY` or prompted in a TTY. Agent-scoped keys
 (`g_agent_*`) are rejected with `403`.
 
@@ -148,7 +148,7 @@ Skills (and `TOOLS.md`) are read straight from the scaffold —
 
 ### `graft push`
 
-Same as `pack`, but uploads to the user's personal storage on the
+Same as `pack`, but uploads to tenant-scoped personal storage on the
 Guayaba backend instead of writing locally. Drafts are private until
 explicitly submitted for review.
 
@@ -162,9 +162,13 @@ Options:
       --cover <path>       Optional cover image (PNG/JPG/WebP, ≤ 4 MB).
 ```
 
-Authentication: requires an account **master** API key (`g_master_*`).
+Authentication: requires a tenant-bound **master** API key (`g_master_*`).
 Read from `$GUAYABA_API_KEY` or prompted in a TTY. Agent-scoped keys
 (`g_agent_*`) are rejected with `403`.
+
+The CLI does not accept a tenant selector and does not send a tenant header.
+The backend derives ownership from the master API key and stores bundles under
+the corresponding `personal/{tenant_id}/...` prefix.
 
 > **Immutable versions:** pushing the same `(slug, version)` pair twice
 > returns `409 Conflict`. Bump `metadata.version` in `graft.json` to
@@ -240,7 +244,7 @@ The full author-facing reference is in
 
 | Variable | Required | Description |
 |---|---|---|
-| `GUAYABA_API_KEY` | Yes (for `validate` / `push`) | Account master API key (`g_master_*`). Prompted interactively when missing and stdin is a TTY. |
+| `GUAYABA_API_KEY` | Yes (for `validate` / `push`) | Tenant-bound master API key (`g_master_*`). Prompted interactively when missing and stdin is a TTY. |
 | `GUAYABA_API_BASE_URL` | No | Override the API base URL. Defaults to `https://api.guayaba.run/api/v1`. |
 
 ## Programmatic API

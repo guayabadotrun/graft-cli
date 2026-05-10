@@ -58,6 +58,7 @@ All four commands require `--framework` (currently only `openclaw` is supported)
 - **`bundle.ts` force-chmods `install.sh` to 0o755** — `(srcStat.mode & 0o777) | 0o755` so the launcher can exec it even if the author forgot `chmod +x`.
 - **`$GUAYABA_API_BASE_URL`** — overrides the hardcoded `https://api.guayaba.run/api/v1` for local dev or staging. Do not add a CLI flag for this; it's intentional that it's env-only.
 - **Slave keys are rejected** — the backend returns HTTP 403 for slave keys on both `POST /grafts` and the asset endpoints. Only master API keys work.
+- **No tenant selector/header** — validate, push, and asset uploads send only `Authorization: Bearer <g_master_*>`. Backend derives tenant ownership from the master key/default tenant and stores personal GRAFT data under `personal/{tenant_id}/...`.
 - **`augmentSchemaWithMechanicalFields` is called in `pushClient.ts` before POSTing** — the form-field `schema` must match the bundle's `schema.json` exactly; the augmentation runs on both code paths.
 - **`KNOWN_MATERIALIZERS` is currently empty** — the scaffolded `materialize` enrichment is wired but no env-key recipes are registered yet. The block in the README doc example (`gh auth login`) was deliberately removed from the registry because the launcher base image doesn't ship `gh`.
 - **Asset uploads use plain `POST`** — the route accepts both `POST` and `PUT` (`Route::match`). The CLI sends a regular `POST` multipart without method-spoofing. This avoids PHP `finfo` MIME detection issues that arise when method-spoofing is combined with binary file uploads.
@@ -72,9 +73,9 @@ All requests go to `API_BASE_URL` (default `https://api.guayaba.run/api/v1`).
 | Endpoint | Method | Auth | Content-Type | Used by |
 |---|---|---|---|---|
 | `/grafts/validate` | POST | `Authorization: Bearer <master_key>` | `application/json` | `validate` command |
-| `/grafts` | POST | `Authorization: Bearer <master_key>` | `multipart/form-data` (fields: `metadata` JSON, `schema` JSON, `bundle` tar.gz) | `push` command |
-| `/grafts/{slug}/assets/icon` | POST | `Authorization: Bearer <master_key>` | `multipart/form-data` (field: `file` Blob) | `push --icon` |
-| `/grafts/{slug}/assets/cover` | POST | `Authorization: Bearer <master_key>` | `multipart/form-data` (field: `file` Blob) | `push --cover` |
+| `/grafts` | POST | `Authorization: Bearer <master_key>`; tenant inferred backend-side | `multipart/form-data` (fields: `metadata` JSON, `schema` JSON, `bundle` tar.gz) | `push` command |
+| `/grafts/{slug}/assets/icon` | POST | `Authorization: Bearer <master_key>`; tenant inferred backend-side | `multipart/form-data` (field: `file` Blob) | `push --icon` |
+| `/grafts/{slug}/assets/cover` | POST | `Authorization: Bearer <master_key>`; tenant inferred backend-side | `multipart/form-data` (field: `file` Blob) | `push --cover` |
 
 HTTP outcomes:
 - `validate`: 200 → ok+warnings, 422 → validation issues, 401 → bad key
@@ -85,7 +86,7 @@ HTTP outcomes:
 
 - **`graft init` output** — the "Next steps" section names `graft.json` explicitly as the main file to edit, then lists sidecars. Earlier it only mentioned sidecars, leading authors to miss metadata/schema changes needed in `graft.json`.
 - **Slug validation in `init` prompt** — `clack.ts` validates slug format client-side (`/^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/`, max 100 chars) to give immediate feedback before hitting the network. The backend remains the authoritative validator — this is UX, not a gate.
-- **409 vs 422 in push** — `pushClient.ts` handles 409 separately from 422. If the 409 body contains `errors.metadata.version` (version already exists for slug), the message gets a ` → Bump metadata.version in graft.json and push again.` hint. If there are no structured errors (slug owned by another author), the fallback hint suggests choosing a different slug.
+- **409 vs 422 in push** — `pushClient.ts` handles 409 separately from 422. If the 409 body contains `errors.metadata.version` (version already exists for slug), the message gets a ` → Bump metadata.version in graft.json and push again.` hint. If there are no structured errors (slug owned by another tenant/author), the fallback hint suggests choosing a different slug.
 
 ## Current known debt / stale comments
 
