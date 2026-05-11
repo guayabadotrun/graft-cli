@@ -8,51 +8,47 @@
 
 | Severity | Active | Main categories |
 |---|---:|---|
-| Medium | 4 | Materializers, auth typing, generated docs, memory use |
+| Medium | 3 | Auth typing, generated docs, memory use |
 | Low | 3 | Comments, exports documentation, lint workaround |
+
+> Re-verified against the codebase on May 10, 2026. Resolved and accepted items have been removed from this debt list; items below are active.
 
 ## Medium
 
-### 1. Mechanical materializer registry is empty
-
-**File**: `src/graft/scaffoldFields.ts`
-
-`augmentSchemaWithMechanicalFields()` is wired, but `KNOWN_MATERIALIZERS` is `{}`. The CLI will not auto-generate `materialize` blocks until recipes are added and verified against the launcher base image.
-
-### 2. Generated README text can overstate materializer support
+### 1. Generated README text can overstate materializer support
 
 **File**: `src/graft/bundle.ts`
 
-The bundled README describes materialize examples even though no recipes are registered today. Keep the example clearly framed as manual schema authoring until the registry is populated.
+The bundled README still says the scaffold pre-fills mechanical entries such as skill/channel secret fields and a `GITHUB_TOKEN` materializer. Current code does not derive those fields, and the materializer registry is intentionally empty. Rewrite this generated README section so materializers are framed as manual schema authoring unless/until a recipe is registered.
 
-### 3. Programmatic validation client accepts missing API keys
+### 2. Programmatic validation client accepts missing API keys
 
 **File**: `src/api/validateClient.ts`
 
-`ValidateClientOptions.apiKey` is optional in the TypeScript interface, but the backend rejects unauthenticated validation requests. The CLI always passes a key. Either make the type required or document anonymous use as unsupported.
+`ValidateClientOptions.apiKey` is optional in the TypeScript interface, and `validateGraftPackage()` simply omits the `Authorization` header when absent. The backend rejects anonymous validation with 401. The CLI always resolves and passes a key. Either make the type required in the next breaking library release or keep it optional but explicitly document that anonymous validation is unsupported and returns a request error.
 
-### 4. Bundle upload buffers the whole tarball
+### 3. Bundle upload buffers the whole tarball
 
 **File**: `src/api/pushClient.ts`
 
-The push client drains `graft.tar.gz` to a `Buffer` because Node's global `fetch` cannot compute multipart `Content-Length` for a streaming body. This is acceptable under the current backend cap, but large bundles can still spike CLI memory.
+The push client still drains `graft.tar.gz` to a `Buffer` because Node's global `fetch` cannot compute multipart `Content-Length` for a streaming body. This is acceptable under the current backend cap, but large bundles can still spike CLI memory. Keep this debt unless the HTTP client/backend upload path changes.
 
 ## Low
 
-### 5. `void appliedSidecars` is a lint workaround
+### 4. `void appliedSidecars` is a lint workaround
 
 **File**: `src/cli.ts`
 
-The push command logs sidecars earlier and then keeps `void appliedSidecars` to silence unused-variable warnings in alternate build settings. Remove it when the logging/control flow is simplified.
+The push command logs sidecars immediately before upload and still keeps `void appliedSidecars`. In current code this is redundant; remove it when the logging/control flow is simplified.
 
-### 6. `src/index.ts` package-surface comment is stale
+### 5. `src/index.ts` package-surface comment is stale
 
 **File**: `src/index.ts`
 
-The top-level comment understates the exported API surface. The package now exports validation/push clients, bundle helpers, metadata types, and more than just version/workspace helpers.
+The top-level comment still understates the exported API surface. The package now exports validation/push clients, bundle helpers, metadata types, and more than just version/workspace helpers.
 
-### 7. Category list is statically duplicated
+### 6. Category list is statically duplicated
 
 **File**: `src/graft/package.ts`
 
-`KNOWN_CATEGORY_SLUGS` mirrors backend-seeded categories. The CLI tolerates unknown values, but a future `GET /grafts/categories` endpoint would remove this duplication.
+`KNOWN_CATEGORY_SLUGS` still mirrors backend-seeded categories. The CLI tolerates unknown values, but a future `GET /grafts/categories` endpoint would remove this duplication.
