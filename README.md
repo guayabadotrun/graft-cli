@@ -237,8 +237,8 @@ When **not** to use it:
   hook entirely. The agent template tells the LLM it has root and can
   install anything it needs.
 
-The full author-facing reference is in
-[gene-seed/public/guides/authoring-grafts.md](https://github.com/guayaba/gene-seed/blob/main/public/guides/authoring-grafts.md#optional-shipping-an-installsh-hook).
+The full author-facing reference is in the public docs:
+[guayaba-docs/guides/authoring-grafts.md](https://github.com/guayaba/guayaba-docs/blob/master/guides/authoring-grafts.md#optional-shipping-an-installsh-hook).
 
 ## Environment variables
 

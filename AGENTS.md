@@ -90,5 +90,13 @@ HTTP outcomes:
 
 ### Current known debt
 
-- `src/graft/scaffoldFields.ts` `KNOWN_MATERIALIZERS` is empty — the README template still shows `materialize` examples as templated, but the registry generates nothing.
-- `validateClient.ts` JSDoc says `apiKey?` is optional — technically true in the interface, but the backend rejects unauthenticated requests (401). Callers should always pass a key.
+From `docs/technical-debt.md` (May 2026, 6 active items):
+
+| Severity | File | Issue |
+|---|---|---|
+| 🟠 Medium | `src/graft/bundle.ts` | Bundled README still says the scaffold pre-fills `fields[]` mechanically (skill/channel secrets, `GITHUB_TOKEN` materializer). `KNOWN_MATERIALIZERS` is intentionally empty in `scaffoldFields.ts`. |
+| 🟠 Medium | `src/api/validateClient.ts` | `ValidateClientOptions.apiKey` is optional in the type, but the backend rejects anonymous validation with 401. CLI always passes a key — make this explicit in the next breaking release. |
+| 🟠 Medium | `src/api/pushClient.ts` | Bundle drained to `Buffer` because Node `fetch` cannot compute multipart `Content-Length` for streams. Acceptable under current backend cap. |
+| 🟡 Low | `src/cli.ts` | `void appliedSidecars` lint workaround is redundant; remove when logging/control flow is simplified. |
+| 🟡 Low | `src/index.ts` | Top-level package-surface comment understates the exported API surface. |
+| 🟡 Low | `src/graft/package.ts` | `KNOWN_CATEGORY_SLUGS` mirrors backend-seeded categories; future `GET /grafts/categories` would remove the duplication. |
