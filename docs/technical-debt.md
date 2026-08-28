@@ -2,7 +2,9 @@
 
 > CLI/library audit for `@guayaba/graft-cli`. Covers GRAFT scaffold generation, validation, bundling, push, assets, sidecars, and OpenClaw workspace extraction.
 >
-> **Last updated:** June 2026
+> **Last updated:** August 2026
+
+> Re-verified against the codebase on August 28, 2026. All 7 items remain active. The generated README (#1, #4) is doubly wrong: it documents the obsolete `graft push ./${slug}-${version}.tar.gz` tarball flow (the upload UI already exists at `/grafts/mine`, and `graft push` now requires `--framework` + scaffold dir, not a tarball path) and never mentions `graft pack` / `graft push --framework --input <scaffold>`.
 
 ## Summary
 
@@ -10,8 +12,6 @@
 |---|---:|---|
 | Medium | 4 | Auth typing, generated docs, memory use, stale generated push instructions |
 | Low | 3 | Comments, exports documentation, lint workaround |
-
-> Re-verified against the codebase on May 10, 2026. Resolved and accepted items have been removed from this debt list; items below are active.
 
 ## Medium
 
