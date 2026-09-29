@@ -11,7 +11,8 @@
 | Severity | Active | Main categories |
 |---|---:|---|
 | Medium | 4 | Auth typing, generated docs, memory use, stale generated push instructions |
-| Low | 3 | Comments, exports documentation, lint workaround |
+| Low | 5 | Comments, exports documentation, lint workaround, dead helper |
+| **Total** | **9** | |
 
 ## Medium
 
@@ -60,3 +61,17 @@ The top-level comment still understates the exported API surface. The package no
 **File**: `src/graft/package.ts`
 
 `KNOWN_CATEGORY_SLUGS` still mirrors backend-seeded categories. The CLI tolerates unknown values, but a future `GET /grafts/categories` endpoint would remove this duplication.
+
+## Newly identified (September 29, 2026)
+
+### 8. `extractChannels()` is production-dead
+
+**File**: `src/graft/scaffoldFields.ts`
+
+`extractChannels()` (`src/graft/scaffoldFields.ts:119-123`) has no production caller — only its own tests reference it (`src/graft/__tests__/scaffoldFields.test.ts:5,130`). Remove it, or re-wire a caller if channel inspection is still needed.
+
+### 9. Stale in-code comments
+
+**Files**: `src/cli.ts`, `src/framework/mapping.ts`, `src/graft/metadata.ts`, `src/api/validateClient.ts`
+
+Four comments no longer match the code: `src/cli.ts:1-24` still describes the old `-w <workspace>` pack/push flow (the commands now take `--framework` + optional `--input`); `src/framework/mapping.ts:9-11` says `workspaceFilename` is copied by `graft init`, which contradicts `copyWorkspaceSidecars` (`src/framework/sidecars.ts:130-133`); `src/graft/metadata.ts:4` references a nonexistent `graft init --validate <api>` flag; `src/api/validateClient.ts:53` says `API_BASE_URL` already ends in `/api` while it ends in `/api/v1` (`src/config.ts:8`).

@@ -90,13 +90,16 @@ HTTP outcomes:
 
 ### Current known debt
 
-From `docs/technical-debt.md` (May 2026, 6 active items):
+From `docs/technical-debt.md` (September 2026, 9 active items):
 
 | Severity | File | Issue |
 |---|---|---|
 | 🟠 Medium | `src/graft/bundle.ts` | Bundled README still says the scaffold pre-fills `fields[]` mechanically (skill/channel secrets, `GITHUB_TOKEN` materializer). `KNOWN_MATERIALIZERS` is intentionally empty in `scaffoldFields.ts`. |
 | 🟠 Medium | `src/api/validateClient.ts` | `ValidateClientOptions.apiKey` is optional in the type, but the backend rejects anonymous validation with 401. CLI always passes a key — make this explicit in the next breaking release. |
 | 🟠 Medium | `src/api/pushClient.ts` | Bundle drained to `Buffer` because Node `fetch` cannot compute multipart `Content-Length` for streams. Acceptable under current backend cap. |
+| 🟠 Medium | `src/graft/bundle.ts` | Generated README still documents the obsolete tarball push flow (`graft push ./${slug}-${version}.tar.gz`); current `push` requires `--framework` + scaffold input, and the upload UI already exists at `/grafts/mine`. |
 | 🟡 Low | `src/cli.ts` | `void appliedSidecars` lint workaround is redundant; remove when logging/control flow is simplified. |
 | 🟡 Low | `src/index.ts` | Top-level package-surface comment understates the exported API surface. |
 | 🟡 Low | `src/graft/package.ts` | `KNOWN_CATEGORY_SLUGS` mirrors backend-seeded categories; future `GET /grafts/categories` would remove the duplication. |
+| 🟡 Low | `src/graft/scaffoldFields.ts` | `extractChannels()` is production-dead — only its own tests reference it (`src/graft/__tests__/scaffoldFields.test.ts`). |
+| 🟡 Low | `src/cli.ts`, `src/framework/mapping.ts`, `src/graft/metadata.ts`, `src/api/validateClient.ts` | Stale in-code comments: `cli.ts:1-24` still describes the old `-w <workspace>` pack/push flow; `mapping.ts:9-11` contradicts `copyWorkspaceSidecars`; `metadata.ts:4` cites a nonexistent `graft init --validate <api>` flag; `validateClient.ts:53` says `API_BASE_URL` ends in `/api` (it ends in `/api/v1`). |
