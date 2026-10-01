@@ -1,5 +1,5 @@
 // Mechanical `fields[]` derivation for the "Download GRAFT scaffolding"
-// flow (grafts-marketplace.md §3.6.2 — Control A).
+// flow.
 //
 // Design intent: secrets and runtime variables are **declared by the
 // graft author** in `schema.fields[]`. The CLI does NOT try to invent
@@ -107,17 +107,4 @@ export function augmentSchemaWithMechanicalFields(
     ...schema,
     fields: enriched,
   };
-}
-
-/**
- * Pull the channel slug list out of `schema.defaults.channels` if it
- * exists and is an array of strings. Returns `[]` otherwise — never
- * throws. Kept here (rather than removed) because callers still need to
- * inspect declared channels for unrelated bookkeeping; not used by the
- * augmenter itself anymore.
- */
-export function extractChannels(schema: GraftDocument): string[] {
-  const channels = schema.defaults?.channels;
-  if (!Array.isArray(channels)) return [];
-  return channels.filter((c): c is string => typeof c === 'string');
 }

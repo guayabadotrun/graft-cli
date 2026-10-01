@@ -28,7 +28,10 @@ export type ValidateResult =
     };
 
 export interface ValidateClientOptions {
-  /** Account-level master API key. The endpoint is auth-gated. */
+  /**
+   * Account-level master API key. The endpoint is auth-gated: anonymous
+   * validation is unsupported and returns 401.
+   */
   apiKey?: string;
   /** Override fetch (mostly for tests). Defaults to `globalThis.fetch`. */
   fetchImpl?: typeof fetch;
@@ -50,7 +53,7 @@ export class ValidateRequestError extends Error {
 }
 
 function joinUrl(path: string): string {
-  // API_BASE_URL already ends in `/api`. Path is expected to start with `/`.
+  // API_BASE_URL already ends in `/api/v1`. Path is expected to start with `/`.
   return `${API_BASE_URL.replace(/\/+$/, '')}${path}`;
 }
 

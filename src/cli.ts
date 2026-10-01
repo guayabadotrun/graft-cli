@@ -1,8 +1,6 @@
 // CLI entry point — wired up by tsup with a `#!/usr/bin/env node` banner
 // and exposed as the `graft` binary in package.json.
 //
-// Workflow (gene-seed/internal/architecture/grafts-marketplace.md §3):
-//
 //   1. `graft init --framework openclaw -w <workspace> -o <scaffold>`
 //      Creates a scaffold directory containing `graft.json` (declarative
 //      schema) plus markdown sidecars (SOUL.md, IDENTITY.md, AGENTS.md
@@ -14,14 +12,14 @@
 //      envelope to the backend. Backend is the single source of truth
 //      for whether the result is acceptable.
 //
-//   3. `graft pack --framework openclaw [-i <scaffold>] -w <workspace>`
-//      Same inline step, then writes a `graft.tar.gz` locally. Skills
-//      are read from the workspace (not the scaffold) — the scaffold
-//      only owns the prose fields.
+//   3. `graft pack --framework openclaw [-i <scaffold>]`
+//      Same inline step, then writes a `graft.tar.gz` locally.
 //
-//   4. `graft push --framework openclaw [-i <scaffold>] -w <workspace>`
+//   4. `graft push --framework openclaw [-i <scaffold>]`
 //      Same as `pack`, but uploads to the user's personal area on the
 //      Guayaba backend instead of writing locally.
+//
+// All commands default `--input` to the current working directory.
 
 import { Command } from 'commander';
 import { writeFile, access, readFile, mkdir, rm } from 'node:fs/promises';
@@ -482,10 +480,6 @@ program
         }
         throw err;
       }
-
-      // Avoid unused-variable warning in environments where sidecar list
-      // isn't logged elsewhere.
-      void appliedSidecars;
     },
   );
 

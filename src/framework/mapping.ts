@@ -7,8 +7,9 @@
 //                       dev edits this). Named after the wizard field so
 //                       the purpose is obvious at a glance.
 // `workspaceFilename` — the corresponding file in the agent workspace
-//                       (framework-native name). Used by `graft init` to
-//                       copy the existing content as a starting point.
+//                       (framework-native name). Used by
+//                       `copyWorkspaceSidecars` to copy the existing
+//                       content as a starting point.
 //
 // The schema field path is dot-notation: `personality` is top-level,
 // `settings.extra_instructions` is nested.

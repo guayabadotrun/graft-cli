@@ -1,9 +1,9 @@
 // Pure helpers for deriving metadata defaults and shaping user input.
 // No prompts, no IO. Format/length validation is intentionally NOT done
 // here — the backend's GraftSchemaValidator + ValidateGraftRequest are
-// the single source of truth, reachable via `graft init --validate <api>`
-// or as part of submitting the GRAFT. Replicating those rules in TS would
-// drift; the prompts layer only enforces "non-empty when required".
+// the single source of truth, reachable as part of submitting the GRAFT.
+// Replicating those rules in TS would drift; the prompts layer only
+// enforces "non-empty when required".
 
 import type { OpenclawAgentSummary } from '../openclaw/extract.js';
 import type { GraftMetadata } from './package.js';

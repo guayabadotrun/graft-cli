@@ -2,8 +2,8 @@
 //
 // Anything that's safe to call from another tool (no prompts, no
 // process.exit, no console output beyond what the caller asks for)
-// belongs here. Right now we expose the package version and the
-// OpenClaw workspace reader.
+// belongs here: validation/push clients, bundle helpers, framework
+// mappings, and metadata types.
 
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';

@@ -1,9 +1,6 @@
 import { describe, it, expect } from 'vitest';
 
-import {
-  augmentSchemaWithMechanicalFields,
-  extractChannels,
-} from '../scaffoldFields.js';
+import { augmentSchemaWithMechanicalFields } from '../scaffoldFields.js';
 import type { GraftDocument, GraftField } from '../build.js';
 
 const baseSchema: GraftDocument = {
@@ -124,27 +121,5 @@ describe('augmentSchemaWithMechanicalFields', () => {
     expect(JSON.stringify(input)).toBe(before); // unchanged
     // No auto-materialize for GITHUB_TOKEN; field is preserved as-is.
     expect(augmented.fields[0]).toMatchObject({ id: 'github_token' });
-  });
-});
-
-describe('extractChannels', () => {
-  it('returns the channels list when defaults.channels is a string array', () => {
-    const schema: GraftDocument = {
-      schema_version: 2,
-      framework_constraints: ['openclaw'],
-      defaults: { channels: ['telegram'] },
-      fields: [],
-    };
-    expect(extractChannels(schema)).toEqual(['telegram']);
-  });
-
-  it('returns [] when defaults.channels is missing', () => {
-    const schema: GraftDocument = {
-      schema_version: 2,
-      framework_constraints: ['openclaw'],
-      defaults: {},
-      fields: [],
-    };
-    expect(extractChannels(schema)).toEqual([]);
   });
 });
