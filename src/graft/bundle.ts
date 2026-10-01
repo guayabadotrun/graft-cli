@@ -362,14 +362,16 @@ the GRAFT marketplace docs — search "schema_version 2" in the public API docs.
 
 ## What's already templated for you
 
-This scaffold pre-fills \`fields[]\` with the **mechanical** entries the launcher
-can derive without guessing:
+Nothing is auto-derived. The scaffold ships the source agent's literal values
+and whatever \`fields[]\` the author already declared — the CLI does **not**
+invent fields from skill metadata or channel tokens (the install wizard already
+collects channel credentials in its own panel, so deriving them here would
+duplicate inputs).
 
-- One \`secret\` field per skill that declares a \`primary_env\` in its manifest.
-- One \`secret\` field per channel that needs a token (e.g. Telegram).
-- A \`materialize\` block on well-known secrets (e.g. \`GITHUB_TOKEN\` runs
-  \`gh auth login --with-token\` at agent boot, so the user never has to set
-  up the CLI by hand).
+The only mechanical enrichment: when a \`secret\` field's binding matches a
+well-known materialize recipe, that recipe is attached automatically. The
+registry is currently empty, so today every \`materialize\` block is authored
+by hand (see below).
 
 Free-text variables (\`{{topic}}\`, \`{{tone}}\`, \`{{audience}}\` …) are **your job**
 — the export tool deliberately doesn't try to invent them from prose.
@@ -378,7 +380,9 @@ Free-text variables (\`{{topic}}\`, \`{{tone}}\`, \`{{audience}}\` …) are **yo
 
 A \`secret\` field's value is just a string until something puts it where the
 skill expects it. Add a \`materialize\` block to the field to tell the launcher
-how to do that at boot. Two shapes:
+how to do that at boot (the CLI only attaches these automatically for
+well-known recipes — none are registered today, so author them by hand).
+Two shapes:
 
 **File** — write the secret to disk (e.g. \`~/.aws/credentials\`,
 \`~/.config/notion/api_key\`):
@@ -415,6 +419,11 @@ how to do that at boot. Two shapes:
 }
 \`\`\`
 
+The command must exist inside the agent container — the launcher base image is
+intentionally minimal. If the binary is missing, install it from \`install.sh\`
+(the GRAFT's first-apply hook) or drop the \`materialize\` block and let the
+skill read the env var directly.
+
 The \`{{value}}\` placeholder expands to the secret value in \`template\`,
 \`stdin\`, and each \`run\` argv token. \`materialize\` is only valid on \`type:
 secret\` fields whose binding starts with \`settings.secrets.\`. The launcher
@@ -440,23 +449,27 @@ it's optional.
 
 ## Re-packing after edits
 
+You don't need to re-pack to push — \`graft push\` reads the scaffold directory
+directly. If you want a tarball (for example to upload it from the manager UI),
+pack it with the CLI:
+
 \`\`\`bash
-cd ${slug}-${version}/
-tar -czf ../${slug}-${version}.tar.gz .
+npx @guayaba/graft-cli pack --framework openclaw --input ./${slug}-${version}
 \`\`\`
 
-(Run from inside the extracted folder so the tarball has the same flat layout.)
+(Run it from inside the extracted folder and omit \`--input\` to use the current
+directory.)
 
 ## Pushing the edited bundle
 
-Until the "Upload bundle" UI ships, use the CLI:
-
 \`\`\`bash
-npx @guayaba/graft-cli push ./${slug}-${version}.tar.gz
+npx @guayaba/graft-cli push --framework openclaw --input ./${slug}-${version}
 \`\`\`
 
 This calls \`POST /api/grafts\` with your master API key and creates (or
-versions) the personal GRAFT. The same \`(slug, version)\` is **immutable** —
-bump the version in \`metadata.json\` to push a new revision.
+versions) the personal GRAFT. The same \`(slug, version)\` pair is **immutable**
+— bump the version in \`metadata.json\` to push a new revision. You can also
+upload a packed tarball from the "My GRAFTs" page at \`/grafts/mine\` in the
+manager UI.
 `;
 }

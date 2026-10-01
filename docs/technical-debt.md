@@ -4,23 +4,17 @@
 >
 > **Last updated:** September 2026
 
-> Re-verified against the codebase on September 29, 2026. All 7 items remain active. The generated README (#1, #4) is doubly wrong: it documents the obsolete `graft push ./${slug}-${version}.tar.gz` tarball flow (the upload UI already exists at `/grafts/mine`, and `graft push` now requires `--framework` + scaffold dir, not a tarball path) and never mentions `graft pack` / `graft push --framework --input <scaffold>`.
+> Re-verified against the codebase on September 29, 2026. Items #1 and #4 (generated README) were resolved on October 1, 2026; the remaining items stay active.
 
 ## Summary
 
 | Severity | Active | Main categories |
 |---|---:|---|
-| Medium | 4 | Auth typing, generated docs, memory use, stale generated push instructions |
+| Medium | 2 | Auth typing, memory use |
 | Low | 5 | Comments, exports documentation, lint workaround, dead helper |
-| **Total** | **9** | |
+| **Total** | **7** | |
 
 ## Medium
-
-### 1. Generated README text can overstate materializer support
-
-**File**: `src/graft/bundle.ts`
-
-The bundled README still says the scaffold pre-fills mechanical entries such as skill/channel secret fields and a `GITHUB_TOKEN` materializer. Current code does not derive those fields, and the materializer registry is intentionally empty. Rewrite this generated README section so materializers are framed as manual schema authoring unless/until a recipe is registered.
 
 ### 2. Programmatic validation client accepts missing API keys
 
@@ -33,14 +27,6 @@ The bundled README still says the scaffold pre-fills mechanical entries such as 
 **File**: `src/api/pushClient.ts`
 
 The push client still drains `graft.tar.gz` to a `Buffer` because Node's global `fetch` cannot compute multipart `Content-Length` for a streaming body. This is acceptable under the current backend cap, but large bundles can still spike CLI memory. Keep this debt unless the HTTP client/backend upload path changes.
-
-### 4. Generated README still documents an obsolete tarball push flow
-
-**Files**: `src/graft/bundle.ts`, `src/cli.ts`, `gene-seed/internal/grafts/marketplace-features.md`
-
-The generated README still says "Until the Upload bundle UI ships" and instructs `npx @guayaba/graft-cli push ./${slug}-${version}.tar.gz`. Current CLI `push` requires scaffold input (`--framework`, optional `--input`) and the manager UI upload flow already exists under `/grafts/mine`.
-
-**Fix direction**: regenerate the README section to document the current scaffold-based push flow (`graft push --framework openclaw --input <scaffold_dir>`) and remove the stale "upload UI not shipped" wording.
 
 ## Low
 
