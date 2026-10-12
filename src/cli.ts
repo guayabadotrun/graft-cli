@@ -26,6 +26,7 @@ import {
 } from './index.js';
 import type { GraftDocument } from './graft/build.js';
 import type { GraftMetadata, GraftPackage } from './graft/package.js';
+import { resolveCategorySlugs } from './api/constantsClient.js';
 import { createClackPrompter } from './prompts/clack.js';
 import {
   isSupportedFramework,
@@ -139,6 +140,25 @@ function reportValidation(result: Awaited<ReturnType<typeof validateGraftPackage
   }
   console.error(`graft ${command}: backend rejected the GRAFT.`);
   process.exit(2);
+}
+
+/**
+ * Best-effort local pre-check for `metadata.category_slugs`: resolve the
+ * known slugs (live from `GET /grafts/constants`, falling back to the
+ * compiled-in list when the API is unreachable) and warn about entries
+ * the backend doesn't know about. Never blocks the command.
+ */
+async function warnUnknownCategorySlugs(
+  metadata: GraftMetadata,
+  apiKey: string | undefined,
+): Promise<void> {
+  if (metadata.category_slugs.length === 0) return;
+  const known = await resolveCategorySlugs({ apiKey });
+  for (const slug of metadata.category_slugs) {
+    if (!known.includes(slug)) {
+      console.log(`  warning: unknown category slug '${slug}' (known: ${known.join(', ')})`);
+    }
+  }
 }
 
 // ─── Program ─────────────────────────────────────────────────
@@ -327,6 +347,7 @@ program
     for (const s of appliedSidecars) {
       console.log(`  inlined ${s.filename} (${s.bytes} bytes)`);
     }
+    await warnUnknownCategorySlugs(envelope.metadata, apiKey);
     try {
       const result = await validateGraftPackage(envelope, { apiKey });
       reportValidation(result, 'validate');
@@ -439,6 +460,7 @@ program
       for (const s of appliedSidecars) {
         console.log(`  inlined ${s.filename} (${s.bytes} bytes)`);
       }
+      await warnUnknownCategorySlugs(envelope.metadata, apiKey);
 
       try {
         const result = await pushGraftPackage(envelope, scaffoldDir, assets, { apiKey });

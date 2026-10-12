@@ -2,8 +2,9 @@
 // `POST /grafts` endpoint will accept.
 //
 // The backend stores `metadata` as columns and `schema` as a single JSON
-// column (gene-seed §2.1.1). We mirror that split on disk so the same
-// file can be diffed by humans, validated by the CLI, and posted as-is.
+// column. We mirror that split
+// on disk so the same file can be diffed by humans, validated by the
+// CLI, and posted as-is.
 
 import type { GraftDocument } from './build.js';
 
@@ -43,13 +44,15 @@ export interface GraftPackage {
 }
 
 /**
- * Slugs of seeded categories in `GraftSeeder::seedCategories()`. Kept
- * here as a constant so the prompts layer can validate user input
- * before we have a `GET /grafts/categories` endpoint to fetch them.
+ * Offline fallback for the backend-seeded category slugs
+ * (`GraftSeeder::seedCategories()`). The live list is fetched from
+ * `GET /grafts/constants` at validate/push time (see
+ * `src/api/constantsClient.ts`); this constant is only used when the API
+ * is unreachable or the request fails.
  *
- * If the backend grows new categories, append here AND update the
- * seeder. The CLI tolerates unknown values (warns but doesn't reject)
- * so a slightly-stale CLI doesn't block submissions.
+ * If the backend grows new categories, update the seeder first — the
+ * CLI tolerates unknown values (warns but doesn't reject) so a
+ * slightly-stale fallback doesn't block submissions.
  */
 export const KNOWN_CATEGORY_SLUGS = [
   'productivity',
