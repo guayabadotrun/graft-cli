@@ -2,17 +2,17 @@
 
 > CLI/library audit for `@guayaba/graft-cli`. Covers GRAFT scaffold generation, validation, bundling, push, assets, sidecars, and OpenClaw workspace extraction.
 >
-> **Last updated:** October 2026
+> **Last updated:** October 12, 2026
 
-> Re-verified against the codebase on October 6, 2026. Items #1, #2, #4, #5, #6, #8 and #9 were resolved and removed on October 1, 2026 (IDs are not renumbered); #3 and #7 remain active and two new items (#10, #11) were added.
+> Re-verified against the codebase on October 12, 2026: all four pre-existing items remain active (line refs refreshed for #7 and #11) and one new item (#12) was added. Previously: items #1, #2, #4, #5, #6, #8 and #9 were resolved and removed on October 1, 2026 (IDs are not renumbered); #3 and #7 remained active and two new items (#10, #11) were added on October 6, 2026.
 
 ## Summary
 
 | Severity | Active | Main categories |
 |---|---:|---|
 | Medium | 1 | Memory use |
-| Low | 3 | Category duplication, duplicated HTTP plumbing, stale gene-seed refs |
-| **Total** | **4** | |
+| Low | 4 | Category duplication, duplicated HTTP plumbing, stale gene-seed refs, dead import + stale comment |
+| **Total** | **5** | |
 
 ## Medium
 
@@ -28,7 +28,7 @@ The push client still drains `graft.tar.gz` to a `Buffer` because Node's global 
 
 **File**: `src/graft/package.ts:54-61` (`KNOWN_CATEGORY_SLUGS`), stale comment at `:46-48`
 
-`KNOWN_CATEGORY_SLUGS` still mirrors backend-seeded categories, but the endpoint it was waiting for now exists: `GET /api/grafts/constants` returns live `category_slugs` (`convolution-api/app/Http/Controllers/API/Graft/ListGraftConstantsController.php:62`, route at `routes/api.php:223`). No file under `graft-cli/src` calls it, and the comment still says "before we have a `GET /grafts/categories` endpoint".
+`KNOWN_CATEGORY_SLUGS` still mirrors backend-seeded categories, but the endpoint it was waiting for now exists: `GET /api/grafts/constants` returns live `category_slugs` (`convolution-api/app/Http/Controllers/API/Graft/ListGraftConstantsController.php:62`, route at `routes/api.php:247`). No file under `graft-cli/src` calls it, and the comment still says "before we have a `GET /grafts/categories` endpoint".
 
 **Fix direction**: fetch the slugs from `/api/grafts/constants` at build/validate time (with the static list as offline fallback) and drop the stale comment.
 
@@ -46,9 +46,19 @@ The push client still drains `graft.tar.gz` to a `Buffer` because Node's global 
 
 ### 11. Stale gene-seed references (moved docs and dead section numbers)
 
-**Files**: `src/graft/bundle.ts:33`, `src/graft/build.ts:32` (both cite `gene-seed/internal/roadmap/grafts-marketplace.md` §0.3/§0.4), `src/graft/build.ts:41` (`§2.1`), `src/graft/package.ts:5` (`§2.1.1`), `src/openclaw/extract.ts:30` (`§1.1`)
+**Files**: `src/graft/bundle.ts:6,33,91,112,152`, `src/graft/build.ts:32,41` (cite `gene-seed/internal/roadmap/grafts-marketplace.md` §0.3/§0.4.x/§2.1), `src/graft/package.ts:5` (`§2.1.1`), `src/openclaw/extract.ts:30` (`§1.1`), `src/openclaw/skills.ts:7,51,65,298,328` (`§0.3/§0.4.x/§3.6.2`), `src/graft/__tests__/bundle.test.ts:122` (`§0.3`)
 
-The roadmap file was reorganized (its own header: "Last reorg: 2026-04-29") and no longer contains those sections; the shipped behavior lives in `gene-seed/internal/grafts/marketplace.md`, which uses no numbered scheme.
+The roadmap file has been reorganized twice since those comments were written (its own header: "Last reorg: 2026-10-12 — shipped items removed"; live sections are `0b-0c`, `2a-2i` and `3d-3g`, and the old `0.3`/`0.4.x`/`1.1`/`2.1`/`2.1.1`/`3.6.2` numbers no longer exist in it); the shipped behavior lives in `gene-seed/internal/grafts/marketplace.md`, which has its own numbering.
 
-**Fix direction**: point the comments at the current doc (file, not section numbers).
+**Fix direction**: point the comments at the current doc (file, not section numbers) and sweep all `§` references.
+
+---
+
+## Newly identified (October 12, 2026)
+
+### 12. Dead import and stale scaffold-sidecar comment in `cli.ts` (Low)
+
+**File**: `src/cli.ts:56` (`sidecarFilenamesFor` imported but never used in the file; only the test suite consumes the symbol, `src/framework/__tests__/sidecars.test.ts:9,148`), `src/cli.ts:4-8` (the header comment says the scaffold contains "SOUL.md, IDENTITY.md, AGENTS.md for openclaw — names match the source framework"; the actual scaffold files are `personality.md`/`vibe.md`/`extra_instructions.md` — `src/framework/mapping.ts:36-38` — while SOUL/IDENTITY/AGENTS are the *workspace* filenames)
+
+**Fix direction**: drop the unused import and correct the comment.
 

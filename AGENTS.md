@@ -90,9 +90,12 @@ HTTP outcomes:
 
 ### Current known debt
 
-From `docs/technical-debt.md` (September 2026, 2 active items):
+From `docs/technical-debt.md` (October 2026, 5 active items):
 
 | Severity | File | Issue |
 |---|---|---|
 | 🟠 Medium | `src/api/pushClient.ts` | Bundle drained to `Buffer` because Node `fetch` cannot compute multipart `Content-Length` for streams. Acceptable under current backend cap. |
-| 🟡 Low | `src/graft/package.ts` | `KNOWN_CATEGORY_SLUGS` mirrors backend-seeded categories; future `GET /grafts/categories` would remove the duplication. |
+| 🟡 Low | `src/graft/package.ts` | `KNOWN_CATEGORY_SLUGS` mirrors backend-seeded categories; `GET /api/grafts/constants` now exposes the live list and is not consumed yet. |
+| 🟡 Low | `src/api/validateClient.ts` + `src/api/pushClient.ts` | Duplicated HTTP plumbing (`normaliseLaravelErrors`, `joinUrl`, guards, 401 handling). |
+| 🟡 Low | `src/graft/*`, `src/openclaw/*` | Stale `gene-seed/.../grafts-marketplace.md §N.N` references (moved doc, dead section numbers). |
+| 🟡 Low | `src/cli.ts` | Dead `sidecarFilenamesFor` import and a stale scaffold-sidecar comment (SOUL/IDENTITY/AGENTS are workspace names, not scaffold filenames). |
