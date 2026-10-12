@@ -27,8 +27,8 @@ export interface OpenclawAgentSummary {
   };
   /**
    * Universal-language fields as defined by the GRAFT schema v2
-   * "ubiquitous language" (gene-seed §1.1). Present only when the
-   * underlying config actually carries them — never guessed.
+   * "ubiquitous language". Present only when the underlying config
+   * actually carries them — never guessed.
    */
   universal: {
     /** Model id without the provider prefix, e.g. `anthropic/claude-sonnet-4.6`. */

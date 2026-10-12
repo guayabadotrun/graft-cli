@@ -118,9 +118,9 @@ describe('buildGraftBundle', () => {
     const schemaJson = JSON.parse((await extractFile(out, './schema.json')).toString('utf8'));
     expect(schemaJson.schema_version).toBe(2);
 
-    // The author-facing scaffold guide is shipped inside every bundle
-    // (see grafts-marketplace.md §3.6.2). Sanity-check it mentions the
-    // slug and the two key authoring instructions.
+    // The author-facing scaffold guide is shipped inside every bundle.
+    // Sanity-check it mentions the slug and the two key authoring
+    // instructions.
     const readme = (await extractFile(out, './README.md')).toString('utf8');
     expect(readme).toContain('demo-graft');
     expect(readme).toContain('{{');

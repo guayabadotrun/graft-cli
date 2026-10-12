@@ -3,7 +3,7 @@
 // endpoint with a master API key, or via the launcher's internal
 // equivalent with a launcher API key).
 //
-// The on-the-wire layout is (frozen — see grafts-marketplace.md §0.4.5):
+// The on-the-wire layout is frozen:
 //
 //   graft.tar.gz
 //   ├── README.md                   ← author-facing scaffold guide
@@ -30,8 +30,7 @@
 // secret materialisation should use `fields[].materialize` instead.
 //
 // We deliberately don't include icon/cover here — those are unversioned
-// per gene-seed/internal/roadmap/grafts-marketplace.md §0.3 and are
-// uploaded via a separate endpoint (one per slug, last-write-wins).
+// and are uploaded via a separate endpoint (one per slug, last-write-wins).
 //
 // Side-effect contract: the function spawns a `tar` child and returns its
 // stdout. The temp directory used for assembly is cleaned up when `done`
@@ -88,7 +87,7 @@ export async function buildGraftBundle(
   try {
     // List skills up front for the per-skill tarballs below. Each skill
     // also gets a sidecar `<name>.manifest.json` so the backend never
-    // needs to crack open the archive at apply time (§0.4.5).
+    // needs to crack open the archive at apply time.
     const { skills } = await listInstalledSkills(workspacePath);
     const skillManifests = skills.map((s) => buildSkillManifest(s));
 
@@ -109,7 +108,7 @@ export async function buildGraftBundle(
       'utf8',
     );
     // Author-facing guide. Lives in the bundle so the documentation
-    // travels with the artefact — see grafts-marketplace.md §3.6.2.
+    // travels with the artefact.
     await fs.writeFile(
       path.join(stageDir, 'README.md'),
       renderScaffoldReadme(metadata),
@@ -130,8 +129,8 @@ export async function buildGraftBundle(
     // (e.g. `gh` CLI for a GitHub skill). Use `fields[].materialize`
     // for secret-shape conversion; use `install.sh` for binary/runtime
     // setup. The agent can also self-install missing tools at chat
-    // time (see launcher AGENTS.md template) — install.sh is the
-    // zero-touch path so the first user message just works.
+    // time — install.sh is the zero-touch path so the first user message
+    // just works.
     await copyInstallScriptIntoBundle(workspacePath, stageDir);
 
     // Skills directory — only created if the workspace has any. An empty
@@ -149,8 +148,8 @@ export async function buildGraftBundle(
         const tarPath = path.join(skillsDir, `${skill.name}.tar.gz`);
         const manifestPath = path.join(skillsDir, `${skill.name}.manifest.json`);
         await writeSkillTarball(skill.path, tarPath);
-        // Per §0.4.5, the manifest is written next to the tar so the
-        // backend never needs to crack open the archive at apply time.
+        // The manifest is written next to the tar so the backend never
+        // needs to crack open the archive at apply time.
         await fs.writeFile(
           manifestPath,
           JSON.stringify(manifest, null, 2),

@@ -28,18 +28,17 @@ import type { OpenclawAgentSummary, ThinkingLevel } from '../openclaw/extract.js
  *
  * Mirrors `GraftSchemaValidator::ALLOWED_GRAFT_CHANNELS` in the backend
  * (convolution-api). `chat` is intentionally excluded — it's the always-on
- * gateway transport, not a channel (see
- * gene-seed/internal/roadmap/grafts-marketplace.md §0.4.1+§0.4.2). Adding a
- * channel here MUST be paired with the launcher learning to wire it AND the
- * matching PHP constant.
+ * gateway transport, not a channel. Adding a channel here MUST be
+ * paired with the launcher learning to wire it AND the matching PHP
+ * constant.
  */
 export const ALLOWED_GRAFT_CHANNELS = ['telegram'] as const;
 export type AllowedGraftChannel = typeof ALLOWED_GRAFT_CHANNELS[number];
 
 /**
  * Minimal structural typing for what we emit. The marketplace spec
- * (gene-seed §2.1) allows arbitrary additional keys inside `defaults`
- * so we keep the shape open.
+ * allows arbitrary additional keys inside `defaults` so we keep the
+ * shape open.
  */
 export interface GraftDocument {
   schema_version: 2;

@@ -3,8 +3,8 @@
 // Responsibilities:
 //   - Scan an OpenClaw agent workspace for installed skills.
 //   - Parse each `SKILL.md` frontmatter using `gray-matter`, then enforce
-//     the OpenClaw spec via `validateSkillFrontmatter` (canonical
-//     contract, see grafts-marketplace.md §0.4.4).
+//     the OpenClaw spec via `validateSkillFrontmatter` (the canonical
+//     contract).
 //   - Produce a tar.gz stream of any one skill directory, suitable for
 //     uploading as a GRAFT bundle.
 //
@@ -48,8 +48,8 @@ export interface ListSkillsResult {
    * Per-name conflicts where a lower-precedence root was silently dropped
    * because the same `name` already appeared in a higher-precedence root.
    * The launcher logs these as WARN so the conflict is visible to the
-   * user in the in-UI agent log viewer (see grafts-marketplace.md §0.4.3).
-   * graft-cli currently ignores them.
+   * user in the in-UI agent log viewer. graft-cli currently
+   * ignores them.
    */
   duplicates: Array<{ name: string; winner: SkillRoot; loser: SkillRoot }>;
 }
@@ -62,7 +62,7 @@ const SKILL_NAME_PATTERN = /^[a-z0-9_-]+$/;
 // Strategy: parse with `gray-matter` (which accepts arbitrary YAML),
 // then enforce the OpenClaw single-line constraint with a strict
 // post-validator. This way we get a battle-tested parser AND keep the
-// canonical Guayaba SKILL.md spec honest. See §0.4.4 of the roadmap.
+// canonical Guayaba SKILL.md spec honest.
 
 /** Top-level keys recognised by the OpenClaw skill spec. */
 const KNOWN_FRONTMATTER_KEYS = new Set([
@@ -295,7 +295,7 @@ async function scanRoot(rootDir: string, root: SkillRoot): Promise<{ skills: Ins
  * Skills found in `<workspace>/skills` take precedence over the same name
  * in `<workspace>/.agents/skills`; lower-precedence duplicates are dropped
  * silently from `skills`, but reported via `duplicates` so callers (the
- * launcher) can log them. See grafts-marketplace.md §0.4.3.
+ * launcher) can log them.
  */
 export async function listInstalledSkills(workspacePath: string): Promise<ListSkillsResult> {
   const winners = new Map<string, SkillRoot>();
@@ -324,8 +324,6 @@ export async function listInstalledSkills(workspacePath: string): Promise<ListSk
  * `agent_skills.manifest`. The shape is framework-agnostic on purpose: a
  * future Paperclip launcher will produce the same JSON from whatever its
  * skill format looks like, and the backend never has to know.
- *
- * See grafts-marketplace.md §0.4.4 + §0.4.5.
  */
 export interface SkillManifestJson {
   name: string;
