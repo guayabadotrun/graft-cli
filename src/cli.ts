@@ -1,25 +1,8 @@
 // CLI entry point — wired up by tsup with a `#!/usr/bin/env node` banner
 // and exposed as the `graft` binary in package.json.
 //
-//   1. `graft init --framework openclaw -w <workspace> -o <scaffold>`
-//      Creates a scaffold directory containing `graft.json` (declarative
-//      schema) plus markdown sidecars (SOUL.md, IDENTITY.md, AGENTS.md
-//      for openclaw — names match the source framework so the dev sees
-//      something familiar). The dev then trims the sidecars by hand.
-//
-//   2. `graft validate --framework openclaw [-i <scaffold>]`
-//      Inlines the sidecars into the schema's `defaults` and POSTs the
-//      envelope to the backend. Backend is the single source of truth
-//      for whether the result is acceptable.
-//
-//   3. `graft pack --framework openclaw [-i <scaffold>]`
-//      Same inline step, then writes a `graft.tar.gz` locally.
-//
-//   4. `graft push --framework openclaw [-i <scaffold>]`
-//      Same as `pack`, but uploads to the user's personal area on the
-//      Guayaba backend instead of writing locally.
-//
-// All commands default `--input` to the current working directory.
+// Commands: init (scaffold), validate, pack, push. Full flag reference in
+// README.md. All commands default `--input` to the current working directory.
 
 import { Command } from 'commander';
 import { writeFile, access, readFile, mkdir, rm } from 'node:fs/promises';
@@ -53,7 +36,6 @@ import {
   copyWorkspaceSidecars,
   copyWorkspaceSkills,
   inlineSidecars,
-  sidecarFilenamesFor,
 } from './framework/sidecars.js';
 
 // ─── Shared helpers ──────────────────────────────────────────

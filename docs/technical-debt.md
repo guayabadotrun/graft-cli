@@ -4,15 +4,15 @@
 >
 > **Last updated:** October 12, 2026
 
-> Re-verified against the codebase on October 12, 2026: all four pre-existing items remain active (line refs refreshed for #7 and #11) and one new item (#12) was added. Previously: items #1, #2, #4, #5, #6, #8 and #9 were resolved and removed on October 1, 2026 (IDs are not renumbered); #3 and #7 remained active and two new items (#10, #11) were added on October 6, 2026.
+> Re-verified against the codebase on October 12, 2026: all four pre-existing items remain active (line refs refreshed for #7 and #11) and one new item (#12) was added — #12 was resolved and removed the same day. Previously: items #1, #2, #4, #5, #6, #8 and #9 were resolved and removed on October 1, 2026 (IDs are not renumbered); #3 and #7 remained active and two new items (#10, #11) were added on October 6, 2026.
 
 ## Summary
 
 | Severity | Active | Main categories |
 |---|---:|---|
 | Medium | 1 | Memory use |
-| Low | 4 | Category duplication, duplicated HTTP plumbing, stale gene-seed refs, dead import + stale comment |
-| **Total** | **5** | |
+| Low | 3 | Category duplication, duplicated HTTP plumbing, stale gene-seed refs |
+| **Total** | **4** | |
 
 ## Medium
 
@@ -51,14 +51,4 @@ The push client still drains `graft.tar.gz` to a `Buffer` because Node's global 
 The roadmap file has been reorganized twice since those comments were written (its own header: "Last reorg: 2026-10-12 — shipped items removed"; live sections are `0b-0c`, `2a-2i` and `3d-3g`, and the old `0.3`/`0.4.x`/`1.1`/`2.1`/`2.1.1`/`3.6.2` numbers no longer exist in it); the shipped behavior lives in `gene-seed/internal/grafts/marketplace.md`, which has its own numbering.
 
 **Fix direction**: point the comments at the current doc (file, not section numbers) and sweep all `§` references.
-
----
-
-## Newly identified (October 12, 2026)
-
-### 12. Dead import and stale scaffold-sidecar comment in `cli.ts` (Low)
-
-**File**: `src/cli.ts:56` (`sidecarFilenamesFor` imported but never used in the file; only the test suite consumes the symbol, `src/framework/__tests__/sidecars.test.ts:9,148`), `src/cli.ts:4-8` (the header comment says the scaffold contains "SOUL.md, IDENTITY.md, AGENTS.md for openclaw — names match the source framework"; the actual scaffold files are `personality.md`/`vibe.md`/`extra_instructions.md` — `src/framework/mapping.ts:36-38` — while SOUL/IDENTITY/AGENTS are the *workspace* filenames)
-
-**Fix direction**: drop the unused import and correct the comment.
 
