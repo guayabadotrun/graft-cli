@@ -7,7 +7,7 @@
 **Critical foot-guns:**
 - **Scaffold file is `graft.json`**, not `schema.json`. The bundle writes `schema.json` + `metadata.json` separately inside the tar.
 - **`validate` requires an API key** — the endpoint is auth-gated even though it's read-only.
-- **Only master API keys work** — slave keys get HTTP 403 on `POST /grafts` and asset endpoints.
+- **Only master API keys work** — the CLI does not inspect the key prefix (`resolveApiKey`, `src/cli.ts:93-111`); ownership is enforced server-side (a slave/agent key only reaches its own agent's routes, `ValidatePublicApiKey.php:65-82`), so a mistyped agent key fails late with a backend 401/403 instead of at startup.
 - **`augmentSchemaWithMechanicalFields` must be called before POSTing** — the form-field `schema` must match the bundle's `schema.json` exactly.
 - **`install.sh` is force-chmod'd to `0755`** in the bundle regardless of source file mode.
 - **`ALLOWED_GRAFT_CHANNELS = ['telegram']`** — `chat` is NOT a channel.
@@ -90,7 +90,7 @@ HTTP outcomes:
 
 ### Current known debt
 
-From `docs/technical-debt.md` (October 16, 2026, 3 active items):
+From `docs/technical-debt.md` (October 21, 2026, 3 active items):
 
 | Severity | File | Issue |
 |---|---|---|
