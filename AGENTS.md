@@ -97,3 +97,8 @@ From `docs/technical-debt.md` (October 16, 2026, 3 active items):
 | 🟠 Medium | `src/api/pushClient.ts` | Bundle drained to `Buffer` because Node `fetch` cannot compute multipart `Content-Length` for streams. Acceptable under current backend cap (#3). |
 | 🟡 Low | `src/api/validateClient.ts` + `src/api/pushClient.ts` + `src/api/constantsClient.ts` | Duplicated HTTP plumbing (`normaliseLaravelErrors`, `joinUrl`, guards, 401 handling) across three clients (#10). |
 | 🟡 Low | `src/api/*.ts`, `src/cli.ts` | No HTTP request timeouts; the awaited category pre-check can block validate/push despite its "never blocks" docblock (#13). |
+
+## Done means
+
+- `npm run typecheck && npm run test` passes.
+- `git diff` contains no unrelated files.
