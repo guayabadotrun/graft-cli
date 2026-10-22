@@ -5,7 +5,7 @@ import type { GraftDocument, GraftField } from '../build.js';
 
 const baseSchema: GraftDocument = {
   schema_version: 2,
-  framework_constraints: ['openclaw'],
+  harness_constraints: ['openclaw'],
   defaults: { channels: ['telegram'] },
   fields: [],
 };
@@ -103,7 +103,7 @@ describe('augmentSchemaWithMechanicalFields', () => {
   it('returns a new object — does not mutate the input schema', () => {
     const input: GraftDocument = {
       schema_version: 2,
-      framework_constraints: ['openclaw'],
+      harness_constraints: ['openclaw'],
       defaults: { channels: ['telegram'] },
       fields: [
         {

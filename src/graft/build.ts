@@ -1,4 +1,4 @@
-// GRAFT document builder — turns a framework-specific summary into a
+// GRAFT document builder — turns a harness-specific summary into a
 // `schema_version: 2` document ready to be persisted as `graft.json`.
 //
 // This is the pure half of the pipeline: no IO, no prompts. The CLI
@@ -7,8 +7,8 @@
 //
 // What we DO emit:
 //   - `schema_version: 2` (the only value the backend validator accepts)
-//   - `framework_constraints: ['openclaw']` so the marketplace knows
-//     which frameworks can apply this template
+//   - `harness_constraints: ['openclaw']` so the marketplace knows
+//     which harnesses can apply this template
 //   - `defaults` carrying only the keys we could read unambiguously
 //     (channels, llm_provider_model, settings.thinking)
 //   - `fields: []` — this baseline has no custom user inputs; richer
@@ -42,7 +42,7 @@ export type AllowedGraftChannel = typeof ALLOWED_GRAFT_CHANNELS[number];
  */
 export interface GraftDocument {
   schema_version: 2;
-  framework_constraints: string[];
+  harness_constraints: string[];
   defaults: GraftDefaults;
   fields: GraftField[];
 }
@@ -107,7 +107,7 @@ export function buildGraftFromOpenclaw(summary: OpenclawAgentSummary): GraftDocu
 
   return {
     schema_version: 2,
-    framework_constraints: [summary.framework],
+    harness_constraints: [summary.harness],
     defaults,
     fields: [],
   };

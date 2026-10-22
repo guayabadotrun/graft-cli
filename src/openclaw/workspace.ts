@@ -4,7 +4,7 @@
 // markdown files an agent uses (SOUL/AGENTS/USER/...). Parsing is kept
 // deliberately shallow: this module only proves the workspace is real
 // and surfaces its raw contents. Field extraction (skills, model,
-// channels, etc.) lives in later modules so that adding new frameworks
+// channels, etc.) lives in later modules so that adding new harnesses
 // later doesn't bleed into the file-reading layer.
 
 import { promises as fs } from 'node:fs';

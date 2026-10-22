@@ -1,37 +1,37 @@
-// Framework → GRAFT field mapping registry.
+// Harness → GRAFT field mapping registry.
 //
-// Each supported framework declares which on-disk markdown files carry
+// Each supported harness declares which on-disk markdown files carry
 // which GRAFT schema field.
 //
 // `filename`          — the file as it appears in the GRAFT scaffold (the
 //                       dev edits this). Named after the wizard field so
 //                       the purpose is obvious at a glance.
 // `workspaceFilename` — the corresponding file in the agent workspace
-//                       (framework-native name). Used by
+//                       (harness-native name). Used by
 //                       `copyWorkspaceSidecars` to copy the existing
 //                       content as a starting point.
 //
 // The schema field path is dot-notation: `personality` is top-level,
 // `settings.extra_instructions` is nested.
 
-export type FrameworkSlug = 'openclaw';
+export type HarnessSlug = 'openclaw';
 
 export interface FieldMapping {
   /** Scaffold filename (wizard-field name, e.g. 'personality.md'). */
   filename: string;
-  /** Source file in the agent workspace (framework name, e.g. 'SOUL.md'). */
+  /** Source file in the agent workspace (harness name, e.g. 'SOUL.md'). */
   workspaceFilename: string;
   /** Dot-path inside the GRAFT `defaults` object. */
   schemaField: string;
 }
 
 /**
- * Static registry. Add a new framework by appending an entry. Each entry
+ * Static registry. Add a new harness by appending an entry. Each entry
  * lists ONLY the markdown-backed fields; structured config (channels,
- * model, thinking, skills) is read from the framework's own config file
- * by a separate per-framework extractor.
+ * model, thinking, skills) is read from the harness's own config file
+ * by a separate per-harness extractor.
  */
-export const FRAMEWORK_MAPPINGS: Record<FrameworkSlug, ReadonlyArray<FieldMapping>> = {
+export const FRAMEWORK_MAPPINGS: Record<HarnessSlug, ReadonlyArray<FieldMapping>> = {
   openclaw: [
     { filename: 'personality.md',         workspaceFilename: 'SOUL.md',     schemaField: 'personality' },
     { filename: 'vibe.md',                workspaceFilename: 'IDENTITY.md', schemaField: 'vibe' },
@@ -39,12 +39,12 @@ export const FRAMEWORK_MAPPINGS: Record<FrameworkSlug, ReadonlyArray<FieldMappin
   ],
 };
 
-export const SUPPORTED_FRAMEWORKS = Object.keys(FRAMEWORK_MAPPINGS) as FrameworkSlug[];
+export const SUPPORTED_HARNESSES = Object.keys(FRAMEWORK_MAPPINGS) as HarnessSlug[];
 
-export function isSupportedFramework(slug: unknown): slug is FrameworkSlug {
-  return typeof slug === 'string' && (SUPPORTED_FRAMEWORKS as readonly string[]).includes(slug);
+export function isSupportedHarness(slug: unknown): slug is HarnessSlug {
+  return typeof slug === 'string' && (SUPPORTED_HARNESSES as readonly string[]).includes(slug);
 }
 
-export function mappingFor(framework: FrameworkSlug): ReadonlyArray<FieldMapping> {
-  return FRAMEWORK_MAPPINGS[framework];
+export function mappingFor(harness: HarnessSlug): ReadonlyArray<FieldMapping> {
+  return FRAMEWORK_MAPPINGS[harness];
 }

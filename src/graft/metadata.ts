@@ -50,7 +50,7 @@ export function defaultMetadataFor(summary: OpenclawAgentSummary): GraftMetadata
     version: '0.1.0',
     tags: [],
     category_slugs: [],
-    framework_slugs: [summary.framework],
+    harness_slugs: [summary.harness],
     tier: 'free',
     price_credits: 0,
   };

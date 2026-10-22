@@ -20,7 +20,7 @@ import type { OpenclawWorkspace, WorkspaceMarkdown } from './workspace.js';
 export type ThinkingLevel = 'off' | 'low' | 'medium' | 'high';
 
 export interface OpenclawAgentSummary {
-  framework: 'openclaw';
+  harness: 'openclaw';
   agent: {
     id?: string;
     name?: string;
@@ -117,7 +117,7 @@ export function extractOpenclawSummary(workspace: OpenclawWorkspace): OpenclawAg
   const skills = asStringArray(defaults.skills);
 
   return {
-    framework: 'openclaw',
+    harness: 'openclaw',
     agent: {
       ...(agentId !== undefined ? { id: agentId } : {}),
       ...(agentName !== undefined ? { name: agentName } : {}),

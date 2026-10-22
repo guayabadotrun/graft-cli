@@ -2,7 +2,7 @@
 //
 // Anything that's safe to call from another tool (no prompts, no
 // process.exit, no console output beyond what the caller asks for)
-// belongs here: validation/push clients, bundle helpers, framework
+// belongs here: validation/push clients, bundle helpers, harness
 // mappings, and metadata types.
 
 import { readFileSync } from 'node:fs';

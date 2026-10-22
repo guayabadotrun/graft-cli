@@ -29,7 +29,7 @@ export interface GraftMetadata {
   version: string;
   tags: string[];
   category_slugs: string[];
-  framework_slugs: string[];
+  harness_slugs: string[];
   author_name?: string;
   tier: 'free' | 'premium';
   price_credits: number;

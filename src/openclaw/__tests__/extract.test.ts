@@ -44,7 +44,7 @@ describe('extractOpenclawSummary', () => {
   it('extracts identity, model, thinking and channels from a realistic config', () => {
     const summary = extractOpenclawSummary(makeWorkspace(realisticConfig()));
 
-    expect(summary.framework).toBe('openclaw');
+    expect(summary.harness).toBe('openclaw');
     expect(summary.agent).toEqual({ id: 'agent-uuid', name: 'Halibut' });
     expect(summary.universal.model).toBe('anthropic/claude-sonnet-4.6');
     expect(summary.universal.thinking).toBe('medium');
@@ -95,7 +95,7 @@ describe('extractOpenclawSummary', () => {
   it('returns a minimal summary when the config is essentially empty', () => {
     const summary = extractOpenclawSummary(makeWorkspace({}));
     expect(summary).toEqual({
-      framework: 'openclaw',
+      harness: 'openclaw',
       agent: {},
       universal: { channels: [], skills: [] },
       rawMarkdown: {},

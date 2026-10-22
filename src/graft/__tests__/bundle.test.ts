@@ -85,14 +85,14 @@ const META: GraftMetadata = {
   version: '0.1.0',
   tags: ['x'],
   category_slugs: [],
-  framework_slugs: ['openclaw'],
+  harness_slugs: ['openclaw'],
   tier: 'free',
   price_credits: 0,
 };
 
 const SCHEMA: GraftDocument = {
   schema_version: 2,
-  framework_constraints: ['openclaw'],
+  harness_constraints: ['openclaw'],
   defaults: { channels: ['telegram'] },
   fields: [],
 };

@@ -29,23 +29,23 @@ import type { GraftMetadata, GraftPackage } from './graft/package.js';
 import { resolveCategorySlugs } from './api/constantsClient.js';
 import { createClackPrompter } from './prompts/clack.js';
 import {
-  isSupportedFramework,
-  SUPPORTED_FRAMEWORKS,
-  type FrameworkSlug,
-} from './framework/mapping.js';
+  isSupportedHarness,
+  SUPPORTED_HARNESSES,
+  type HarnessSlug,
+} from './harness/mapping.js';
 import {
   copyWorkspaceSidecars,
   copyWorkspaceSkills,
   inlineSidecars,
-} from './framework/sidecars.js';
+} from './harness/sidecars.js';
 
 // ─── Shared helpers ──────────────────────────────────────────
 
-/** Validate the `--framework` flag value, exiting with a clear message. */
-function requireFramework(command: string, raw: unknown): FrameworkSlug {
-  if (typeof raw !== 'string' || !isSupportedFramework(raw)) {
+/** Validate the `--harness` flag value, exiting with a clear message. */
+function requireHarness(command: string, raw: unknown): HarnessSlug {
+  if (typeof raw !== 'string' || !isSupportedHarness(raw)) {
     console.error(
-      `graft ${command}: --framework is required. Supported: ${SUPPORTED_FRAMEWORKS.join(', ')}.`,
+      `graft ${command}: --harness is required. Supported: ${SUPPORTED_HARNESSES.join(', ')}.`,
     );
     process.exit(1);
   }
@@ -115,12 +115,12 @@ async function resolveApiKey(command: string): Promise<string> {
  */
 async function loadScaffold(
   scaffoldDir: string,
-  framework: FrameworkSlug,
+  harness: HarnessSlug,
   command: string,
 ): Promise<{ envelope: GraftPackage; appliedSidecars: { filename: string; bytes: number }[] }> {
   const envelopePath = resolve(scaffoldDir, 'graft.json');
   const pkg = await readGraftEnvelope(envelopePath, command);
-  const result = await inlineSidecars(pkg.schema, scaffoldDir, framework);
+  const result = await inlineSidecars(pkg.schema, scaffoldDir, harness);
   return {
     envelope: { metadata: pkg.metadata, schema: result.schema },
     appliedSidecars: result.applied.map(({ filename, bytes }) => ({ filename, bytes })),
@@ -178,8 +178,8 @@ program
     'Create a GRAFT scaffold directory: graft.json plus blank markdown sidecar stubs for you to fill in.',
   )
   .requiredOption(
-    '--framework <slug>',
-    `Source framework slug. Supported: ${SUPPORTED_FRAMEWORKS.join(', ')}.`,
+    '--harness <slug>',
+    `Source harness slug. Supported: ${SUPPORTED_HARNESSES.join(', ')}.`,
   )
   .option(
     '-w, --workspace <path>',
@@ -191,16 +191,16 @@ program
   )
   .action(
     async (opts: {
-      framework: string;
+      harness: string;
       workspace?: string;
       out?: string;
     }) => {
-      const framework = requireFramework('init', opts.framework);
+      const harness = requireHarness('init', opts.harness);
       const workspacePath = resolve(opts.workspace ?? process.cwd());
       const scaffoldDir = resolve(opts.out ?? 'graft');
       const interactive = Boolean(process.stdin.isTTY);
 
-      // 1) Read the workspace (framework-specific extractor).
+      // 1) Read the workspace (harness-specific extractor).
       let summary;
       try {
         const ws = await readOpenclawWorkspace(workspacePath);
@@ -262,7 +262,7 @@ program
       const { created: createdSidecars } = await copyWorkspaceSidecars(
         workspacePath,
         scaffoldDir,
-        framework,
+        harness,
       );
 
       // 5b) Copy installed skills (and TOOLS.md when present) so the
@@ -294,7 +294,7 @@ program
 
       // 8) Report.
       console.log(`Scaffold written to ${scaffoldDir}`);
-      console.log(`  framework: ${framework}`);
+      console.log(`  harness: ${harness}`);
       if (summary.agent.name) {
         console.log(`  agent:     ${summary.agent.name}${summary.agent.id ? ` (${summary.agent.id})` : ''}`);
       }
@@ -317,9 +317,9 @@ program
       console.log(`  1. Open graft.json — review and update metadata (name, slug, description, version) and schema fields.`);
       if (createdSidecars.length > 0) {
         console.log(`  2. Edit the sidecars (${createdSidecars.join(', ')}) — replace the placeholder comment with your template content.`);
-        console.log(`  3. Run: graft validate --framework ${framework}`);
+        console.log(`  3. Run: graft validate --harness ${harness}`);
       } else {
-        console.log(`  2. Run: graft validate --framework ${framework}`);
+        console.log(`  2. Run: graft validate --harness ${harness}`);
       }
     },
   );
@@ -330,17 +330,17 @@ program
   .command('validate')
   .description('Inline scaffold sidecars into the schema and validate against the Guayaba backend.')
   .requiredOption(
-    '--framework <slug>',
-    `Source framework slug. Supported: ${SUPPORTED_FRAMEWORKS.join(', ')}.`,
+    '--harness <slug>',
+    `Source harness slug. Supported: ${SUPPORTED_HARNESSES.join(', ')}.`,
   )
   .option(
     '-i, --input <path>',
     'Path to the scaffold directory (containing graft.json + sidecars). Defaults to the current working directory.',
   )
-  .action(async (opts: { framework: string; input?: string }) => {
-    const framework = requireFramework('validate', opts.framework);
+  .action(async (opts: { harness: string; input?: string }) => {
+    const harness = requireHarness('validate', opts.harness);
     const scaffoldDir = resolve(opts.input ?? process.cwd());
-    const { envelope, appliedSidecars } = await loadScaffold(scaffoldDir, framework, 'validate');
+    const { envelope, appliedSidecars } = await loadScaffold(scaffoldDir, harness, 'validate');
     const apiKey = await resolveApiKey('validate');
 
     console.log(`Validating ${envelope.metadata.slug}@${envelope.metadata.version} against Guayaba API …`);
@@ -366,8 +366,8 @@ program
   .command('pack')
   .description('Inline scaffold sidecars and build a GRAFT bundle (graft.tar.gz) locally without uploading.')
   .requiredOption(
-    '--framework <slug>',
-    `Source framework slug. Supported: ${SUPPORTED_FRAMEWORKS.join(', ')}.`,
+    '--harness <slug>',
+    `Source harness slug. Supported: ${SUPPORTED_HARNESSES.join(', ')}.`,
   )
   .option(
     '-i, --input <path>',
@@ -380,12 +380,12 @@ program
   .option('-f, --force', 'Overwrite the output file if it already exists.', false)
   .action(
     async (opts: {
-      framework: string;
+      harness: string;
       input?: string;
       out?: string;
       force?: boolean;
     }) => {
-      const framework = requireFramework('pack', opts.framework);
+      const harness = requireHarness('pack', opts.harness);
       const scaffoldDir = resolve(opts.input ?? process.cwd());
       const outPath = resolve(opts.out ?? 'graft.tar.gz');
 
@@ -397,7 +397,7 @@ program
         }
       }
 
-      const { envelope, appliedSidecars } = await loadScaffold(scaffoldDir, framework, 'pack');
+      const { envelope, appliedSidecars } = await loadScaffold(scaffoldDir, harness, 'pack');
 
       console.log(`Packing ${envelope.metadata.slug}@${envelope.metadata.version} …`);
       for (const s of appliedSidecars) {
@@ -429,8 +429,8 @@ program
   .command('push')
   .description("Inline scaffold sidecars and upload the bundle to the user's personal storage on the Guayaba backend.")
   .requiredOption(
-    '--framework <slug>',
-    `Source framework slug. Supported: ${SUPPORTED_FRAMEWORKS.join(', ')}.`,
+    '--harness <slug>',
+    `Source harness slug. Supported: ${SUPPORTED_HARNESSES.join(', ')}.`,
   )
   .option(
     '-i, --input <path>',
@@ -440,15 +440,15 @@ program
   .option('--cover <path>', 'Optional path to a cover image (PNG/JPG/WebP, ≤ 4 MB).')
   .action(
     async (opts: {
-      framework: string;
+      harness: string;
       input?: string;
       icon?: string;
       cover?: string;
     }) => {
-      const framework = requireFramework('push', opts.framework);
+      const harness = requireHarness('push', opts.harness);
       const scaffoldDir = resolve(opts.input ?? process.cwd());
 
-      const { envelope, appliedSidecars } = await loadScaffold(scaffoldDir, framework, 'push');
+      const { envelope, appliedSidecars } = await loadScaffold(scaffoldDir, harness, 'push');
       const apiKey = await resolveApiKey('push');
 
       const assets = {

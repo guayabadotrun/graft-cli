@@ -1,7 +1,7 @@
 # @guayaba/graft-cli
 
 CLI and programmatic toolkit to scaffold, validate, pack, and publish
-**GRAFTs** (Guayaba Runtime Agent Framework Templates) from existing
+**GRAFTs** (Guayaba Runtime Agent Harness Templates) from existing
 agent workspaces.
 
 A GRAFT is a reusable, declarative agent template that captures
@@ -43,24 +43,24 @@ agent's workspace. The scaffold contains:
 
 ```bash
 # 1. Generate the scaffold from an existing agent workspace.
-graft init --framework openclaw -w ./my-agent -o ./graft
+graft init --harness openclaw -w ./my-agent -o ./graft
 
 # 2. Fill in the sidecar stubs with your template content.
 $EDITOR ./graft/personality.md
 
 # 3. Validate against the Guayaba backend.
-graft validate --framework openclaw -i ./graft
+graft validate --harness openclaw -i ./graft
 
 # 4. (optional) Pack a tarball locally without uploading.
-graft pack --framework openclaw -i ./graft -o ./graft.tar.gz
+graft pack --harness openclaw -i ./graft -o ./graft.tar.gz
 
 # 5. Push to your tenant-scoped personal storage on the Guayaba backend.
-graft push --framework openclaw -i ./graft
+graft push --harness openclaw -i ./graft
 ```
 
-Every command requires `--framework <slug>`. Supported today:
+Every command requires `--harness <slug>`. Supported today:
 `openclaw`. The flag drives the sidecar → schema field mapping (see
-[framework mapping](#framework-mapping) below).
+[harness mapping](#harness-mapping) below).
 
 Global flags available on the root `graft` command:
 
@@ -78,7 +78,7 @@ for you to fill in, and a copy of the workspace's skills.
 
 ```
 Required:
-  --framework <slug>       Source framework. Today: openclaw.
+  --harness <slug>       Source harness. Today: openclaw.
 
 Options:
   -w, --workspace <path>   Workspace root to inspect. Defaults to cwd.
@@ -88,7 +88,7 @@ Options:
 Behaviour:
 
 - Reads the workspace, builds the structural schema (channels, model,
-  thinking) via the framework-specific extractor. **Channel constraint
+  thinking) via the harness-specific extractor. **Channel constraint
   (openclaw):** only `telegram` is supported in `defaults.channels`.
   Specifying any other channel will cause `init` to exit with an error.
 - Asks for marketplace metadata interactively (slug, name, description,
@@ -98,7 +98,7 @@ Behaviour:
   only an instructional HTML comment; the author writes the template
   content themselves. Workspace content is intentionally not copied —
   copying verbatim would duplicate the text when the GRAFT is applied,
-  because the framework combines personality and extra_instructions.
+  because the harness combines personality and extra_instructions.
 - Copies the workspace's installed skills into `<scaffold>/skills/`,
   flattening `<workspace>/skills/` and `<workspace>/.agents/skills/`
   into a single tree. Also copies `TOOLS.md` if present. The scaffold
@@ -115,7 +115,7 @@ Guayaba backend, which is the authoritative validator.
 
 ```
 Required:
-  --framework <slug>
+  --harness <slug>
 
 Options:
   -i, --input <path>       Scaffold dir. Defaults to cwd.
@@ -135,7 +135,7 @@ uploading. Useful for inspection and CI artefacts.
 
 ```
 Required:
-  --framework <slug>
+  --harness <slug>
 
 Options:
   -i, --input <path>       Scaffold dir. Defaults to cwd.
@@ -154,7 +154,7 @@ explicitly submitted for review.
 
 ```
 Required:
-  --framework <slug>
+  --harness <slug>
 
 Options:
   -i, --input <path>       Scaffold dir. Defaults to cwd.
@@ -174,13 +174,13 @@ the corresponding `personal/{tenant_id}/...` prefix.
 > returns `409 Conflict`. Bump `metadata.version` in `graft.json` to
 > push a new revision.
 
-## Framework mapping
+## Harness mapping
 
-Each framework defines a fixed registry of scaffold sidecar → schema
+Each harness defines a fixed registry of scaffold sidecar → schema
 field entries. The CLI uses it to create stubs on `init` and to inline
 content on `validate`/`pack`/`push`.
 
-| Framework | Scaffold sidecar          | Maps to (workspace file) | Schema field                           |
+| Harness | Scaffold sidecar          | Maps to (workspace file) | Schema field                           |
 |-----------|---------------------------|--------------------------|----------------------------------------|
 | openclaw  | `personality.md`          | `SOUL.md`                | `defaults.personality`                 |
 | openclaw  | `vibe.md`                 | `IDENTITY.md`            | `defaults.vibe`                        |
@@ -190,8 +190,8 @@ Empty / whitespace-only sidecars are treated as absent — the
 corresponding field stays out of `defaults`.
 
 The registry lives in
-[`src/framework/mapping.ts`](src/framework/mapping.ts); the inlining
-logic lives in [`src/framework/sidecars.ts`](src/framework/sidecars.ts).
+[`src/harness/mapping.ts`](src/harness/mapping.ts); the inlining
+logic lives in [`src/harness/sidecars.ts`](src/harness/sidecars.ts).
 
 ## Optional `install.sh` hook
 
@@ -261,7 +261,7 @@ import {
 } from '@guayaba/graft-cli';
 ```
 
-Reach into [`src/framework/`](src/framework/) for the sidecar
+Reach into [`src/harness/`](src/harness/) for the sidecar
 machinery if you need to inline outside the CLI shell.
 
 ## Development

@@ -10,7 +10,7 @@
 //
 // Both the launcher (at runtime, on demand) and the CLI (at `graft push`
 // time) consume this module so the on-disk skill format stays in one place.
-// Other framework launchers (Paperclip, Hermes…) are expected to ship
+// Other harness launchers (Paperclip, Hermes…) are expected to ship
 // their own pre-parser that emits the same `<name>.manifest.json` shape;
 // the backend never parses SKILL.md.
 
@@ -321,7 +321,7 @@ export async function listInstalledSkills(workspacePath: string): Promise<ListSk
 /**
  * Normalised skill manifest emitted alongside each `<name>.tar.gz` in a
  * GRAFT bundle. Persisted verbatim by the backend into
- * `agent_skills.manifest`. The shape is framework-agnostic on purpose: a
+ * `agent_skills.manifest`. The shape is harness-agnostic on purpose: a
  * future Paperclip launcher will produce the same JSON from whatever its
  * skill format looks like, and the backend never has to know.
  */

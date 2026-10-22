@@ -4,7 +4,7 @@ import type { OpenclawAgentSummary } from '../../openclaw/extract.js';
 
 function summary(overrides: Partial<OpenclawAgentSummary['universal']> = {}): OpenclawAgentSummary {
   return {
-    framework: 'openclaw',
+    harness: 'openclaw',
     agent: { id: 'agt_1', name: 'Sam' },
     universal: {
       model: 'anthropic/claude-sonnet-4.6',
@@ -18,10 +18,10 @@ function summary(overrides: Partial<OpenclawAgentSummary['universal']> = {}): Op
 }
 
 describe('buildGraftFromOpenclaw', () => {
-  it('emits a schema_version 2 document with the openclaw framework constraint', () => {
+  it('emits a schema_version 2 document with the openclaw harness constraint', () => {
     const doc = buildGraftFromOpenclaw(summary());
     expect(doc.schema_version).toBe(2);
-    expect(doc.framework_constraints).toEqual(['openclaw']);
+    expect(doc.harness_constraints).toEqual(['openclaw']);
   });
 
   it('puts the model under llm_provider_model and thinking under settings', () => {

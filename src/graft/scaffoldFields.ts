@@ -54,7 +54,7 @@ const KNOWN_MATERIALIZERS: Readonly<Record<string, GraftField['materialize']>> =
 /**
  * Inputs for `augmentSchemaWithMechanicalFields`. Currently empty in
  * shape, kept as a struct so future mechanical inputs (extraction
- * targets, framework hints) can be added without churning the call
+ * targets, harness hints) can be added without churning the call
  * sites.
  */
 // eslint-disable-next-line @typescript-eslint/no-empty-interface

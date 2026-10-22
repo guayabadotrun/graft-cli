@@ -97,7 +97,7 @@ export function createClackPrompter(): Prompter {
         version: version.trim(),
         tags: parseTagsInput(tagsRaw ?? ''),
         category_slugs: parseTagsInput(categoriesRaw ?? ''),
-        framework_slugs: [...defaults.framework_slugs],
+        harness_slugs: [...defaults.harness_slugs],
         ...(trimmedAuthor.length > 0 ? { author_name: trimmedAuthor } : {}),
         tier: defaults.tier,
         price_credits: defaults.price_credits,

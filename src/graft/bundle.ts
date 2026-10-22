@@ -17,8 +17,8 @@
 //
 // `<name>.manifest.json` is REQUIRED for every `<name>.tar.gz`. The
 // backend persists it verbatim into `agent_skills.manifest` and never
-// opens the tar — this keeps the backend framework-agnostic and removes
-// PHP from the SKILL.md parsing chain entirely. Future framework
+// opens the tar — this keeps the backend harness-agnostic and removes
+// PHP from the SKILL.md parsing chain entirely. Future harness
 // launchers (Paperclip, Hermes…) emit the same manifest shape; the
 // backend doesn't care.
 //
@@ -453,7 +453,7 @@ directly. If you want a tarball (for example to upload it from the manager UI),
 pack it with the CLI:
 
 \`\`\`bash
-npx @guayaba/graft-cli pack --framework openclaw --input ./${slug}-${version}
+npx @guayaba/graft-cli pack --harness openclaw --input ./${slug}-${version}
 \`\`\`
 
 (Run it from inside the extracted folder and omit \`--input\` to use the current
@@ -462,7 +462,7 @@ directory.)
 ## Pushing the edited bundle
 
 \`\`\`bash
-npx @guayaba/graft-cli push --framework openclaw --input ./${slug}-${version}
+npx @guayaba/graft-cli push --harness openclaw --input ./${slug}-${version}
 \`\`\`
 
 This calls \`POST /api/grafts\` with your master API key and creates (or

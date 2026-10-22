@@ -20,7 +20,7 @@ const DATA = {
   owned_by_prefixes: ['user.'],
   graft_channels: ['telegram'],
   category_slugs: ['productivity', 'dev'],
-  framework_slugs: ['openclaw'],
+  harness_slugs: ['openclaw'],
 };
 
 function mockFetch(
@@ -47,7 +47,7 @@ describe('fetchGraftConstants', () => {
 
     expect(constants.category_slugs).toEqual(['productivity', 'dev']);
     expect(constants.graft_channels).toEqual(['telegram']);
-    expect(constants.framework_slugs).toEqual(['openclaw']);
+    expect(constants.harness_slugs).toEqual(['openclaw']);
     const [url, init] = spy.mock.calls[0]!;
     expect(url).toBe(EXPECTED_URL);
     expect((init as RequestInit).method).toBe('GET');

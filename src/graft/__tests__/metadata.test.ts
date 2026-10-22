@@ -4,7 +4,7 @@ import type { OpenclawAgentSummary } from '../../openclaw/extract.js';
 
 function summary(name: string | undefined): OpenclawAgentSummary {
   return {
-    framework: 'openclaw',
+    harness: 'openclaw',
     agent: name === undefined ? {} : { id: 'agt_1', name },
     universal: { channels: [], skills: [] },
     rawMarkdown: {},
@@ -66,9 +66,9 @@ describe('defaultMetadataFor', () => {
     expect(meta.price_credits).toBe(0);
   });
 
-  it('records the framework slug from the summary in framework_slugs', () => {
+  it('records the harness slug from the summary in harness_slugs', () => {
     const meta = defaultMetadataFor(summary('Sam'));
-    expect(meta.framework_slugs).toEqual(['openclaw']);
+    expect(meta.harness_slugs).toEqual(['openclaw']);
   });
 
   it('starts with empty tags and categories', () => {

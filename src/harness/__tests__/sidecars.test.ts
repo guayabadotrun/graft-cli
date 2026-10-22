@@ -13,7 +13,7 @@ import type { GraftDocument } from '../../graft/build.js';
 function emptyDoc(): GraftDocument {
   return {
     schema_version: 2,
-    framework_constraints: ['openclaw'],
+    harness_constraints: ['openclaw'],
     defaults: {},
     fields: [],
   };

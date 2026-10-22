@@ -4,7 +4,7 @@
 // after their wizard field (personality.md, vibe.md,
 // extra_instructions.md). `validate` and `pack` read those files, strip
 // any leading instructional HTML comment, inline their contents into the
-// GRAFT `defaults` (under the dot-path declared by the framework
+// GRAFT `defaults` (under the dot-path declared by the harness
 // mapping), and hand the resulting envelope to the backend / bundler.
 //
 // Missing sidecars are NOT an error — they map to "field absent in
@@ -14,7 +14,7 @@
 import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
 import type { GraftDocument } from '../graft/build.js';
-import type { FieldMapping, FrameworkSlug } from './mapping.js';
+import type { FieldMapping, HarnessSlug } from './mapping.js';
 import { mappingFor } from './mapping.js';
 
 export interface InlineSidecarsResult {
@@ -26,21 +26,21 @@ export interface InlineSidecarsResult {
 }
 
 /**
- * Read sidecars from `scaffoldDir` according to the given framework
+ * Read sidecars from `scaffoldDir` according to the given harness
  * mapping and return a NEW schema with their contents inlined into
  * `defaults`. Does not mutate the input schema.
  */
 export async function inlineSidecars(
   schema: GraftDocument,
   scaffoldDir: string,
-  framework: FrameworkSlug,
+  harness: HarnessSlug,
 ): Promise<InlineSidecarsResult> {
-  const mapping = mappingFor(framework);
+  const mapping = mappingFor(harness);
   // Deep-clone the parts of `defaults` we may write into so we don't
   // accidentally share array / object references with the caller.
   const next: GraftDocument = {
     ...schema,
-    framework_constraints: [...schema.framework_constraints],
+    harness_constraints: [...schema.harness_constraints],
     defaults: {
       ...schema.defaults,
       ...(schema.defaults.channels ? { channels: [...schema.defaults.channels] } : {}),
@@ -124,20 +124,20 @@ function setByDotPath(target: Record<string, unknown>, pathStr: string, value: s
 /**
  * For `init`: create a stub sidecar file in the scaffold dir for each
  * mapped field. The stub contains only an instructional HTML comment so
- * the author knows which framework file the field maps to; they must
+ * the author knows which harness file the field maps to; they must
  * write the template content themselves.
  *
  * Intentionally does NOT copy workspace content — copying verbatim text
  * from a live agent would duplicate it when the GRAFT is later applied
- * (the framework combines personality + extra_instructions into SOUL.md,
+ * (the harness combines personality + extra_instructions into SOUL.md,
  * so pre-filled defaults would appear twice).
  */
 export async function copyWorkspaceSidecars(
   _workspaceDir: string,
   scaffoldDir: string,
-  framework: FrameworkSlug,
+  harness: HarnessSlug,
 ): Promise<{ created: string[] }> {
-  const mapping = mappingFor(framework);
+  const mapping = mappingFor(harness);
   const created: string[] = [];
 
   for (const entry of mapping) {
@@ -152,7 +152,7 @@ export async function copyWorkspaceSidecars(
 
 /**
  * Build the instructional comment prepended to each scaffold sidecar.
- * The comment tells the author which framework file the content maps to
+ * The comment tells the author which harness file the content maps to
  * and reminds them to remove it before pushing.
  */
 function buildInstructionComment(workspaceFilename: string): string {
@@ -224,6 +224,6 @@ export async function copyWorkspaceSkills(
   return { skills: skills.map((s) => s.name), tools, installScript };
 }
 
-export function sidecarFilenamesFor(framework: FrameworkSlug): string[] {
-  return mappingFor(framework).map((m: FieldMapping) => m.filename);
+export function sidecarFilenamesFor(harness: HarnessSlug): string[] {
+  return mappingFor(harness).map((m: FieldMapping) => m.filename);
 }

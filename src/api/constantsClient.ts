@@ -1,5 +1,5 @@
 // HTTP client for `GET /grafts/constants` — the backend's live GRAFT
-// authoring whitelists (category slugs, framework slugs, channels, field
+// authoring whitelists (category slugs, harness slugs, channels, field
 // keys…). Consumed by the CLI so local hints stay in sync with the
 // backend instead of trusting a frozen copy; see `resolveCategorySlugs`
 // for the offline-fallback contract.
@@ -24,8 +24,8 @@ export interface GraftConstants {
   graft_channels: string[];
   /** Seeded marketplace categories. */
   category_slugs: string[];
-  /** Frameworks whose runtime driver supports GRAFT bundles. */
-  framework_slugs: string[];
+  /** Harnesss whose runtime driver supports GRAFT bundles. */
+  harness_slugs: string[];
 }
 
 export interface ConstantsClientOptions {
@@ -142,7 +142,7 @@ export async function fetchGraftConstants(
     owned_by_prefixes: asStringArray(data.owned_by_prefixes),
     graft_channels: asStringArray(data.graft_channels),
     category_slugs: asStringArray(data.category_slugs),
-    framework_slugs: asStringArray(data.framework_slugs),
+    harness_slugs: asStringArray(data.harness_slugs),
   };
 }
 

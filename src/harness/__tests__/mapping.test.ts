@@ -1,21 +1,21 @@
 import { describe, it, expect } from 'vitest';
 import {
   FRAMEWORK_MAPPINGS,
-  SUPPORTED_FRAMEWORKS,
-  isSupportedFramework,
+  SUPPORTED_HARNESSES,
+  isSupportedHarness,
   mappingFor,
 } from '../mapping.js';
 
-describe('framework mapping registry', () => {
-  it('lists openclaw as a supported framework', () => {
-    expect(SUPPORTED_FRAMEWORKS).toContain('openclaw');
-    expect(isSupportedFramework('openclaw')).toBe(true);
+describe('harness mapping registry', () => {
+  it('lists openclaw as a supported harness', () => {
+    expect(SUPPORTED_HARNESSES).toContain('openclaw');
+    expect(isSupportedHarness('openclaw')).toBe(true);
   });
 
-  it('rejects unknown frameworks', () => {
-    expect(isSupportedFramework('letta')).toBe(false);
-    expect(isSupportedFramework('')).toBe(false);
-    expect(isSupportedFramework(undefined)).toBe(false);
+  it('rejects unknown harnesses', () => {
+    expect(isSupportedHarness('letta')).toBe(false);
+    expect(isSupportedHarness('')).toBe(false);
+    expect(isSupportedHarness(undefined)).toBe(false);
   });
 
   it('exposes the openclaw → schema field mapping using wizard-field filenames', () => {
@@ -35,7 +35,7 @@ describe('framework mapping registry', () => {
   });
 
   it('keeps every mapping discoverable from the registry', () => {
-    for (const slug of SUPPORTED_FRAMEWORKS) {
+    for (const slug of SUPPORTED_HARNESSES) {
       expect(FRAMEWORK_MAPPINGS[slug].length).toBeGreaterThan(0);
     }
   });
