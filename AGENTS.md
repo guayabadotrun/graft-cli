@@ -14,7 +14,7 @@
 - **`schema_version: 2` only** — any other value (including the string `"2"`) is rejected by the backend.
 - **`$GUAYABA_API_BASE_URL`** overrides the default API URL — env-only, intentionally no CLI flag.
 
-**Key files:** `src/cli.ts`, `src/graft/build.ts`, `src/graft/bundle.ts`, `src/api/pushClient.ts`, `src/api/validateClient.ts`, `src/framework/mapping.ts`
+**Key files:** `src/cli.ts`, `src/graft/build.ts`, `src/graft/bundle.ts`, `src/api/http.ts`, `src/api/pushClient.ts`, `src/api/validateClient.ts`, `src/framework/mapping.ts`
 
 > Platform map and inter-service auth: `gene-seed/AGENTS.md`
 
@@ -60,6 +60,7 @@ All commands require `--framework` (currently only `openclaw` is supported).
 | `src/graft/build.ts` | Pure builder: OpenClaw summary → `GraftDocument` (`schema_version: 2`); defines `ALLOWED_GRAFT_CHANNELS` |
 | `src/graft/bundle.ts` | Assembles `graft.tar.gz` via `tar` child process; stages in `os.tmpdir()` |
 | `src/graft/scaffoldFields.ts` | `augmentSchemaWithMechanicalFields` — attaches `materialize` blocks to `secret` fields; `KNOWN_MATERIALIZERS` is currently empty `{}` |
+| `src/api/http.ts` | Shared `requestJson` (URL join, `AbortSignal.timeout`, HTML guard, Laravel error flattening) |
 | `src/api/validateClient.ts` | `POST /grafts/validate` — auth-gated |
 | `src/api/pushClient.ts` | `POST /grafts` (multipart: `bundle`, `metadata`, `schema`) + `POST /grafts/{slug}/assets/{type}` (plain `POST`) |
 | `src/openclaw/workspace.ts` | Reads an OpenClaw workspace from disk |
@@ -90,13 +91,11 @@ HTTP outcomes:
 
 ### Current known debt
 
-From `docs/technical-debt.md` (October 21, 2026, 3 active items):
+From `docs/technical-debt.md` (October 22, 2026, 1 active item):
 
 | Severity | File | Issue |
 |---|---|---|
 | 🟠 Medium | `src/api/pushClient.ts` | Bundle drained to `Buffer` because Node `fetch` cannot compute multipart `Content-Length` for streams. Acceptable under current backend cap (#3). |
-| 🟡 Low | `src/api/validateClient.ts` + `src/api/pushClient.ts` + `src/api/constantsClient.ts` | Duplicated HTTP plumbing (`normaliseLaravelErrors`, `joinUrl`, guards, 401 handling) across three clients (#10). |
-| 🟡 Low | `src/api/*.ts`, `src/cli.ts` | No HTTP request timeouts; the awaited category pre-check can block validate/push despite its "never blocks" docblock (#13). |
 
 ## Done means
 

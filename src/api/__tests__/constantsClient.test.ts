@@ -55,6 +55,7 @@ describe('fetchGraftConstants', () => {
       Accept: 'application/json',
       Authorization: 'Bearer g_master_123',
     });
+    expect((init as RequestInit).signal).toBeInstanceOf(AbortSignal);
   });
 
   it('omits Authorization when no api key provided', async () => {

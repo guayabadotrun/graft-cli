@@ -153,7 +153,7 @@ async function warnUnknownCategorySlugs(
   apiKey: string | undefined,
 ): Promise<void> {
   if (metadata.category_slugs.length === 0) return;
-  const known = await resolveCategorySlugs({ apiKey });
+  const known = await resolveCategorySlugs({ apiKey, timeoutMs: 2_000 });
   for (const slug of metadata.category_slugs) {
     if (!known.includes(slug)) {
       console.log(`  warning: unknown category slug '${slug}' (known: ${known.join(', ')})`);

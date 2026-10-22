@@ -17,13 +17,20 @@ import { Readable } from 'node:stream';
 import type { GraftPackage } from '../graft/package.js';
 import { buildGraftBundle } from '../graft/bundle.js';
 import { augmentSchemaWithMechanicalFields } from '../graft/scaffoldFields.js';
-import { API_BASE_URL } from '../config.js';
+import {
+  HttpResponseError,
+  joinApiUrl,
+  normaliseLaravelErrors,
+  requestJson,
+} from './http.js';
 
 export interface PushClientOptions {
   /** Account-level master API key. Required by the v1 endpoint. */
   apiKey: string;
   /** Override fetch (for tests). Defaults to `globalThis.fetch`. */
   fetchImpl?: typeof fetch;
+  /** Request timeout in milliseconds. Defaults to 300000. */
+  timeoutMs?: number;
   /**
    * Override the bundle builder (tests). Defaults to graft-cli's
    * `buildGraftBundle`. Tests pass a stub that returns a fixed Buffer
@@ -63,6 +70,8 @@ export type PushResult =
       issues: { field: string; message: string }[];
     };
 
+const DEFAULT_TIMEOUT_MS = 300_000;
+
 /**
  * Errors that aren't a normal 422/409 outcome: network failures, 5xx,
  * malformed JSON, missing asset files, bundle build failures. 422 / 409
@@ -76,24 +85,6 @@ export class PushRequestError extends Error {
     this.name = 'PushRequestError';
     this.originalCause = cause;
   }
-}
-
-function joinUrl(path: string): string {
-  // API_BASE_URL ends in `/api/v1`. Push routes live under that prefix.
-  return `${API_BASE_URL.replace(/\/+$/, '')}${path}`;
-}
-
-function normaliseLaravelErrors(errors: unknown): { field: string; message: string }[] {
-  if (!errors || typeof errors !== 'object') return [];
-  const out: { field: string; message: string }[] = [];
-  for (const [field, messages] of Object.entries(errors as Record<string, unknown>)) {
-    if (Array.isArray(messages)) {
-      for (const m of messages) {
-        if (typeof m === 'string') out.push({ field, message: m });
-      }
-    }
-  }
-  return out;
 }
 
 function mimeFor(filename: string): string {
@@ -132,11 +123,6 @@ async function uploadAsset(
   opts: PushClientOptions,
 ): Promise<{ ok: true; path: string } | { ok: false; issues: { field: string; message: string }[] }> {
   const fetchFn = opts.fetchImpl ?? globalThis.fetch;
-  if (typeof fetchFn !== 'function') {
-    throw new PushRequestError(
-      'No fetch implementation available. Use Node.js 18+ or pass fetchImpl.',
-    );
-  }
 
   let bytes: Buffer;
   try {
@@ -152,41 +138,38 @@ async function uploadAsset(
   // natively and finfo MIME detection works reliably without method-spoofing.
   form.append('file', new Blob([bytes], { type: mimeFor(filename) }), filename);
 
-  const url = joinUrl(`/grafts/${encodeURIComponent(slug)}/assets/${type}`);
+  const url = joinApiUrl(`/grafts/${encodeURIComponent(slug)}/assets/${type}`);
 
   let response: Response;
-  try {
-    response = await fetchFn(url, {
-      method: 'POST',
-      headers: {
-        Accept: 'application/json',
-        Authorization: `Bearer ${opts.apiKey}`,
-        // Don't set Content-Type — fetch fills in `multipart/form-data; boundary=...`
-        // automatically when the body is FormData. Setting it manually breaks parsing.
-      },
-      body: form,
-    });
-  } catch (err) {
-    throw new PushRequestError(`Failed to reach ${url}: ${(err as Error).message}`, err);
-  }
-
-  const assetContentType = response.headers.get('content-type') ?? '';
-  if (assetContentType.includes('text/html')) {
-    throw new PushRequestError(
-      `Asset endpoint returned an HTML page (HTTP ${response.status}). ` +
-        'Check that GUAYABA_API_BASE_URL points at the backend API (e.g. http://host:9090/api/v1).',
-    );
-  }
-
   let body: unknown;
   try {
-    body = await response.json();
+    ({ response, body } = await requestJson(
+      fetchFn,
+      url,
+      {
+        method: 'POST',
+        headers: {
+          Accept: 'application/json',
+          Authorization: `Bearer ${opts.apiKey}`,
+          // Don't set Content-Type — fetch fills in `multipart/form-data; boundary=...`
+          // automatically when the body is FormData. Setting it manually breaks parsing.
+        },
+        body: form,
+      },
+      {
+        timeoutMs: opts.timeoutMs ?? DEFAULT_TIMEOUT_MS,
+        label: 'Asset endpoint',
+        htmlHint:
+          'Check that GUAYABA_API_BASE_URL points at the backend API (e.g. http://host:9090/api/v1).',
+        nonJsonHint:
+          'Check that GUAYABA_API_BASE_URL points at the backend API (e.g. http://host:9090/api/v1).',
+      },
+    ));
   } catch (err) {
-    throw new PushRequestError(
-      `Asset endpoint returned non-JSON response (HTTP ${response.status}). ` +
-        'Check that GUAYABA_API_BASE_URL points at the backend API (e.g. http://host:9090/api/v1).',
-      err,
-    );
+    if (err instanceof HttpResponseError) {
+      throw new PushRequestError(err.message, err);
+    }
+    throw err;
   }
 
   if (response.status === 200) {
@@ -237,11 +220,6 @@ export async function pushGraftPackage(
   opts: PushClientOptions,
 ): Promise<PushResult> {
   const fetchFn = opts.fetchImpl ?? globalThis.fetch;
-  if (typeof fetchFn !== 'function') {
-    throw new PushRequestError(
-      'No fetch implementation available. Use Node.js 18+ or pass fetchImpl.',
-    );
-  }
 
   const slug = pkg.metadata.slug;
   const uploaded: PushedAsset[] = [];
@@ -294,46 +272,43 @@ export async function pushGraftPackage(
     );
   }
 
-  const url = joinUrl('/grafts');
+  const url = joinApiUrl('/grafts');
   const form = new FormData();
   form.append('metadata', JSON.stringify(augmentedPkg.metadata));
   form.append('schema', JSON.stringify(augmentedPkg.schema));
   form.append('bundle', new Blob([bundleBytes], { type: 'application/gzip' }), 'graft.tar.gz');
 
   let response: Response;
-  try {
-    response = await fetchFn(url, {
-      method: 'POST',
-      headers: {
-        // No Content-Type — fetch fills in the multipart boundary itself.
-        Accept: 'application/json',
-        Authorization: `Bearer ${opts.apiKey}`,
-      },
-      body: form,
-    });
-  } catch (err) {
-    throw new PushRequestError(`Failed to reach ${url}: ${(err as Error).message}`, err);
-  }
-
-  const contentType = response.headers.get('content-type') ?? '';
-  if (contentType.includes('text/html')) {
-    throw new PushRequestError(
-      `Push endpoint returned an HTML page (HTTP ${response.status}). ` +
-        'This usually means GUAYABA_API_BASE_URL points at a web frontend or reverse-proxy ' +
-        'rather than the Laravel backend directly. ' +
-        'Set GUAYABA_API_BASE_URL=http://<backend-host>:<port>/api/v1 and retry.',
-    );
-  }
-
   let body: unknown;
   try {
-    body = await response.json();
+    ({ response, body } = await requestJson(
+      fetchFn,
+      url,
+      {
+        method: 'POST',
+        headers: {
+          // No Content-Type — fetch fills in the multipart boundary itself.
+          Accept: 'application/json',
+          Authorization: `Bearer ${opts.apiKey}`,
+        },
+        body: form,
+      },
+      {
+        timeoutMs: opts.timeoutMs ?? DEFAULT_TIMEOUT_MS,
+        label: 'Push endpoint',
+        htmlHint:
+          'This usually means GUAYABA_API_BASE_URL points at a web frontend or reverse-proxy ' +
+          'rather than the Laravel backend directly. ' +
+          'Set GUAYABA_API_BASE_URL=http://<backend-host>:<port>/api/v1 and retry.',
+        nonJsonHint:
+          'Check that GUAYABA_API_BASE_URL points at the backend API (e.g. http://host:9090/api/v1).',
+      },
+    ));
   } catch (err) {
-    throw new PushRequestError(
-      `Push endpoint returned non-JSON response (HTTP ${response.status}). ` +
-        'Check that GUAYABA_API_BASE_URL points at the backend API (e.g. http://host:9090/api/v1).',
-      err,
-    );
+    if (err instanceof HttpResponseError) {
+      throw new PushRequestError(err.message, err);
+    }
+    throw err;
   }
 
   if (response.status === 201) {

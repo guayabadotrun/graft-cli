@@ -7,8 +7,8 @@
 // Uses the global `fetch` shipped with Node ≥18 (the CLI's stated min).
 // No third-party HTTP deps: keeps the install footprint tiny.
 
-import { API_BASE_URL } from '../config.js';
 import { KNOWN_CATEGORY_SLUGS } from '../graft/package.js';
+import { HttpResponseError, joinApiUrl, requestJson } from './http.js';
 
 /** Live authoring constants returned by `GET /grafts/constants`. */
 export interface GraftConstants {
@@ -36,7 +36,11 @@ export interface ConstantsClientOptions {
   apiKey?: string;
   /** Override fetch (mostly for tests). Defaults to `globalThis.fetch`. */
   fetchImpl?: typeof fetch;
+  /** Request timeout in milliseconds. Defaults to 5000. */
+  timeoutMs?: number;
 }
+
+const DEFAULT_TIMEOUT_MS = 5_000;
 
 /**
  * Thrown when the constants endpoint can't be reached or returned an
@@ -51,11 +55,6 @@ export class ConstantsRequestError extends Error {
     this.name = 'ConstantsRequestError';
     this.originalCause = cause;
   }
-}
-
-function joinUrl(path: string): string {
-  // API_BASE_URL already ends in `/api/v1`. Path is expected to start with `/`.
-  return `${API_BASE_URL.replace(/\/+$/, '')}${path}`;
 }
 
 function asStringArray(value: unknown): string[] {
@@ -73,44 +72,35 @@ export async function fetchGraftConstants(
   opts: ConstantsClientOptions = {},
 ): Promise<GraftConstants> {
   const fetchFn = opts.fetchImpl ?? globalThis.fetch;
-  if (typeof fetchFn !== 'function') {
-    throw new ConstantsRequestError(
-      'No fetch implementation available. Use Node.js 18+ or pass fetchImpl.',
-    );
-  }
-
-  const url = joinUrl('/grafts/constants');
+  const url = joinApiUrl('/grafts/constants');
 
   let response: Response;
-  try {
-    response = await fetchFn(url, {
-      method: 'GET',
-      headers: {
-        Accept: 'application/json',
-        ...(opts.apiKey ? { Authorization: `Bearer ${opts.apiKey}` } : {}),
-      },
-    });
-  } catch (err) {
-    throw new ConstantsRequestError(`Failed to reach ${url}: ${(err as Error).message}`, err);
-  }
-
-  const contentType = response.headers.get('content-type') ?? '';
-  if (contentType.includes('text/html')) {
-    throw new ConstantsRequestError(
-      `Constants endpoint returned an HTML page (HTTP ${response.status}). ` +
-        'This usually means GUAYABA_API_BASE_URL points at a web frontend or reverse-proxy ' +
-        'rather than the Laravel backend directly.',
-    );
-  }
-
   let body: unknown;
   try {
-    body = await response.json();
+    ({ response, body } = await requestJson(
+      fetchFn,
+      url,
+      {
+        method: 'GET',
+        headers: {
+          Accept: 'application/json',
+          ...(opts.apiKey ? { Authorization: `Bearer ${opts.apiKey}` } : {}),
+        },
+      },
+      {
+        timeoutMs: opts.timeoutMs ?? DEFAULT_TIMEOUT_MS,
+        label: 'Constants endpoint',
+        htmlHint:
+          'This usually means GUAYABA_API_BASE_URL points at a web frontend or reverse-proxy ' +
+          'rather than the Laravel backend directly.',
+        nonJsonHint: 'Check that GUAYABA_API_BASE_URL points at the backend API.',
+      },
+    ));
   } catch (err) {
-    throw new ConstantsRequestError(
-      `Constants endpoint returned non-JSON response (HTTP ${response.status}).`,
-      err,
-    );
+    if (err instanceof HttpResponseError) {
+      throw new ConstantsRequestError(err.message, err);
+    }
+    throw err;
   }
 
   if (response.status === 401) {

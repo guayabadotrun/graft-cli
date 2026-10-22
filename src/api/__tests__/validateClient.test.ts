@@ -58,6 +58,7 @@ describe('validateGraftPackage', () => {
     const [url, init] = spy.mock.calls[0]!;
     expect(url).toBe(EXPECTED_URL);
     expect((init as RequestInit).method).toBe('POST');
+    expect((init as RequestInit).signal).toBeInstanceOf(AbortSignal);
     expect((init as RequestInit).headers).toMatchObject({
       Authorization: 'Bearer k_master_123',
       'Content-Type': 'application/json',

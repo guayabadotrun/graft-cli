@@ -6,7 +6,12 @@
 // No third-party HTTP deps: keeps the install footprint tiny.
 
 import type { GraftPackage } from '../graft/package.js';
-import { API_BASE_URL } from '../config.js';
+import {
+  HttpResponseError,
+  joinApiUrl,
+  normaliseLaravelErrors,
+  requestJson,
+} from './http.js';
 
 /** A single validation problem returned by the backend. */
 export interface ValidationIssue {
@@ -35,7 +40,11 @@ export interface ValidateClientOptions {
   apiKey?: string;
   /** Override fetch (mostly for tests). Defaults to `globalThis.fetch`. */
   fetchImpl?: typeof fetch;
+  /** Request timeout in milliseconds. Defaults to 60000. */
+  timeoutMs?: number;
 }
+
+const DEFAULT_TIMEOUT_MS = 60_000;
 
 /**
  * Thrown when the validate endpoint can't be reached or returned an
@@ -52,75 +61,44 @@ export class ValidateRequestError extends Error {
   }
 }
 
-function joinUrl(path: string): string {
-  // API_BASE_URL already ends in `/api/v1`. Path is expected to start with `/`.
-  return `${API_BASE_URL.replace(/\/+$/, '')}${path}`;
-}
-
-/**
- * Convert Laravel's `errors: { "field": ["msg", ...] }` shape into a flat
- * issue list ordered by field name for stable CLI output.
- */
-function normaliseLaravelErrors(errors: unknown): ValidationIssue[] {
-  if (!errors || typeof errors !== 'object') return [];
-  const out: ValidationIssue[] = [];
-  for (const [field, messages] of Object.entries(errors as Record<string, unknown>)) {
-    if (Array.isArray(messages)) {
-      for (const m of messages) {
-        if (typeof m === 'string') out.push({ field, message: m });
-      }
-    }
-  }
-  return out;
-}
-
 export async function validateGraftPackage(
   pkg: GraftPackage,
   opts: ValidateClientOptions = {},
 ): Promise<ValidateResult> {
   const fetchFn = opts.fetchImpl ?? globalThis.fetch;
-  if (typeof fetchFn !== 'function') {
-    throw new ValidateRequestError(
-      'No fetch implementation available. Use Node.js 18+ or pass fetchImpl.',
-    );
-  }
-
-  const url = joinUrl('/grafts/validate');
+  const url = joinApiUrl('/grafts/validate');
 
   let response: Response;
-  try {
-    response = await fetchFn(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Accept: 'application/json',
-        ...(opts.apiKey ? { Authorization: `Bearer ${opts.apiKey}` } : {}),
-      },
-      body: JSON.stringify(pkg),
-    });
-  } catch (err) {
-    throw new ValidateRequestError(`Failed to reach ${url}: ${(err as Error).message}`, err);
-  }
-
-  const contentType = response.headers.get('content-type') ?? '';
-  if (contentType.includes('text/html')) {
-    throw new ValidateRequestError(
-      `Validate endpoint returned an HTML page (HTTP ${response.status}). ` +
-        'This usually means GUAYABA_API_BASE_URL points at a web frontend or reverse-proxy ' +
-        'rather than the Laravel backend directly. ' +
-        'Set GUAYABA_API_BASE_URL=https://<api-domain>/api/v1 and retry.',
-    );
-  }
-
   let body: unknown;
   try {
-    body = await response.json();
+    ({ response, body } = await requestJson(
+      fetchFn,
+      url,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+          ...(opts.apiKey ? { Authorization: `Bearer ${opts.apiKey}` } : {}),
+        },
+        body: JSON.stringify(pkg),
+      },
+      {
+        timeoutMs: opts.timeoutMs ?? DEFAULT_TIMEOUT_MS,
+        label: 'Validate endpoint',
+        htmlHint:
+          'This usually means GUAYABA_API_BASE_URL points at a web frontend or reverse-proxy ' +
+          'rather than the Laravel backend directly. ' +
+          'Set GUAYABA_API_BASE_URL=https://<api-domain>/api/v1 and retry.',
+        nonJsonHint:
+          'Check that GUAYABA_API_BASE_URL points at the backend API (e.g. https://<api-domain>/api/v1).',
+      },
+    ));
   } catch (err) {
-    throw new ValidateRequestError(
-      `Validate endpoint returned non-JSON response (HTTP ${response.status}). ` +
-        'Check that GUAYABA_API_BASE_URL points at the backend API (e.g. https://<api-domain>/api/v1).',
-      err,
-    );
+    if (err instanceof HttpResponseError) {
+      throw new ValidateRequestError(err.message, err);
+    }
+    throw err;
   }
 
   if (response.status === 200) {
