@@ -14,7 +14,7 @@
 - **`schema_version: 2` only** — any other value (including the string `"2"`) is rejected by the backend.
 - **`$GUAYABA_API_BASE_URL`** overrides the default API URL — env-only, intentionally no CLI flag.
 
-**Key files:** `src/cli.ts`, `src/graft/build.ts`, `src/graft/bundle.ts`, `src/api/http.ts`, `src/api/pushClient.ts`, `src/api/validateClient.ts`, `src/framework/mapping.ts`
+**Key files:** `src/cli.ts`, `src/graft/build.ts`, `src/graft/bundle.ts`, `src/api/http.ts`, `src/api/pushClient.ts`, `src/api/validateClient.ts`, `src/harness/mapping.ts`
 
 > Platform map and inter-service auth: `gene-seed/AGENTS.md`
 
@@ -41,12 +41,12 @@ Node ≥ 18 required (uses global `fetch`, `FormData`, `Blob`).
 
 | Command | What it does | API key required? | API endpoints called |
 |---|---|---|---|
-| `graft init --framework <slug> [-w <workspace>] [-o <out>]` | Read workspace, build `graft.json` + blank sidecar stubs + copy skills | No | None |
-| `graft validate --framework <slug> [-i <scaffold>]` | Inline sidecars into schema, POST to backend for validation | **Yes** | `POST /grafts/validate` |
-| `graft pack --framework <slug> [-i <scaffold>] [-o <out>] [-f]` | Inline sidecars, build `graft.tar.gz` locally | No | None |
-| `graft push --framework <slug> [-i <scaffold>] [--icon <path>] [--cover <path>]` | Inline sidecars, upload assets, build and POST bundle | **Yes** | `POST /grafts/{slug}/assets/{type}`, `POST /grafts` |
+| `graft init --harness <slug> [-w <workspace>] [-o <out>]` | Read workspace, build `graft.json` + blank sidecar stubs + copy skills | No | None |
+| `graft validate --harness <slug> [-i <scaffold>]` | Inline sidecars into schema, POST to backend for validation | **Yes** | `POST /grafts/validate` |
+| `graft pack --harness <slug> [-i <scaffold>] [-o <out>] [-f]` | Inline sidecars, build `graft.tar.gz` locally | No | None |
+| `graft push --harness <slug> [-i <scaffold>] [--icon <path>] [--cover <path>]` | Inline sidecars, upload assets, build and POST bundle | **Yes** | `POST /grafts/{slug}/assets/{type}`, `POST /grafts` |
 
-All commands require `--framework` (currently only `openclaw` is supported).
+All commands require `--harness` (currently only `openclaw` is supported).
 
 ### Key files
 
@@ -55,8 +55,8 @@ All commands require `--framework` (currently only `openclaw` is supported).
 | `src/cli.ts` | Commander program, all four commands, shared helpers (`resolveApiKey`, `loadScaffold`, `reportValidation`) |
 | `src/index.ts` | Programmatic entry point; re-exports safe, side-effect-free APIs |
 | `src/config.ts` | Exports `API_BASE_URL` — defaults to `https://api.guayaba.run/api/v1`, overridable via `$GUAYABA_API_BASE_URL` |
-| `src/framework/mapping.ts` | Static registry: `FrameworkSlug`, `FRAMEWORK_MAPPINGS`, scaffold filename ↔ workspace filename → `defaults` dot-path table |
-| `src/framework/sidecars.ts` | `inlineSidecars`, `copyWorkspaceSidecars`, `copyWorkspaceSkills` |
+| `src/harness/mapping.ts` | Static registry: `HarnessSlug`, `FRAMEWORK_MAPPINGS` (historical name), scaffold filename ↔ workspace filename → `defaults` dot-path table |
+| `src/harness/sidecars.ts` | `inlineSidecars`, `copyWorkspaceSidecars`, `copyWorkspaceSkills` |
 | `src/graft/build.ts` | Pure builder: OpenClaw summary → `GraftDocument` (`schema_version: 2`); defines `ALLOWED_GRAFT_CHANNELS` |
 | `src/graft/bundle.ts` | Assembles `graft.tar.gz` via `tar` child process; stages in `os.tmpdir()` |
 | `src/graft/scaffoldFields.ts` | `augmentSchemaWithMechanicalFields` — attaches `materialize` blocks to `secret` fields; `KNOWN_MATERIALIZERS` is currently empty `{}` |
@@ -78,7 +78,7 @@ All commands require `--framework` (currently only `openclaw` is supported).
 
 HTTP outcomes:
 - `validate`: 200 → ok+warnings, 422 → validation issues, 401 → bad key
-- `push /grafts`: 201 → success (`id`, `version_id`, `bundle_s3_key`), 409 → conflict (version already exists — bump `metadata.version`; or slug owned by another tenant), 401 → bad key, 403 → slave key
+- `push /grafts`: 201 → success (body `data`: `id`, `slug`, `version`, `version_id`, `bundle_s3_key`, `is_personal`), 409 → conflict (version already exists — bump `metadata.version`; or slug owned by another tenant), 401 → bad key, 403 → slave key
 - `push assets`: 200 → ok+path, 401 → bad key, 403 → slave key
 
 ### Non-obvious rules

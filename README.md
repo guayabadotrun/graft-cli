@@ -149,8 +149,9 @@ Skills (and `TOOLS.md`) are read straight from the scaffold —
 ### `graft push`
 
 Same as `pack`, but uploads to tenant-scoped personal storage on the
-Guayaba backend instead of writing locally. Drafts are private until
-explicitly submitted for review.
+Guayaba backend instead of writing locally. Pushes stay personal drafts;
+promotion to the public catalog is an admin-only action
+(`POST /grafts/{slug}/publish`).
 
 ```
 Required:
