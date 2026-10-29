@@ -32,7 +32,7 @@ export interface GraftMetadata {
   harness_slugs: string[];
   author_name?: string;
   tier: 'free' | 'premium';
-  price_credits: number;
+  price_usd: number;
   icon_path?: string;
   cover_image_path?: string;
 }

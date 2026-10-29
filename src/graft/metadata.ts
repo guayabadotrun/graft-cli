@@ -52,6 +52,6 @@ export function defaultMetadataFor(summary: OpenclawAgentSummary): GraftMetadata
     category_slugs: [],
     harness_slugs: [summary.harness],
     tier: 'free',
-    price_credits: 0,
+    price_usd: 0,
   };
 }

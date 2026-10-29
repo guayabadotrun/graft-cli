@@ -23,7 +23,7 @@ function pkg(): GraftPackage {
       category_slugs: [],
       harness_slugs: ['openclaw'],
       tier: 'free',
-      price_credits: 0,
+      price_usd: 0,
     },
     schema: {
       schema_version: 2,

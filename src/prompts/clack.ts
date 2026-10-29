@@ -100,7 +100,7 @@ export function createClackPrompter(): Prompter {
         harness_slugs: [...defaults.harness_slugs],
         ...(trimmedAuthor.length > 0 ? { author_name: trimmedAuthor } : {}),
         tier: defaults.tier,
-        price_credits: defaults.price_credits,
+        price_usd: defaults.price_usd,
       };
     },
   };

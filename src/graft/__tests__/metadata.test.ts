@@ -63,7 +63,7 @@ describe('defaultMetadataFor', () => {
     const meta = defaultMetadataFor(summary('Sam'));
     expect(meta.version).toBe('0.1.0');
     expect(meta.tier).toBe('free');
-    expect(meta.price_credits).toBe(0);
+    expect(meta.price_usd).toBe(0);
   });
 
   it('records the harness slug from the summary in harness_slugs', () => {

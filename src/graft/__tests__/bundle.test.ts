@@ -87,7 +87,7 @@ const META: GraftMetadata = {
   category_slugs: [],
   harness_slugs: ['openclaw'],
   tier: 'free',
-  price_credits: 0,
+  price_usd: 0,
 };
 
 const SCHEMA: GraftDocument = {
