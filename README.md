@@ -21,6 +21,12 @@ Or run on demand:
 npx @guayaba/graft-cli --help
 ```
 
+> **Release state:** npm `latest` is `0.0.6`, while this source tree is
+> `0.1.1`. The published artifact predates the `--harness` flag (0.0.6
+> still takes `--framework`), the `metadata.tier` / `metadata.price_usd`
+> fields and the `GET /grafts/constants` lookup, so every command below
+> requires 0.1.x built from this repository until 0.1.x is published.
+
 ## Workflow at a glance
 
 The CLI generates a self-contained **scaffold directory** from your
@@ -40,6 +46,15 @@ agent's workspace. The scaffold contains:
   first boot to install any binary your bundled skills depend on
   (e.g. `gh`, `aws`). See [Optional `install.sh`
   hook](#optional-installsh-hook) below.
+
+`graft.json`'s `metadata` also carries two marketplace fields that `init`
+writes with defaults and never prompts for:
+
+- `tier` — `free` or `premium` (default `free`).
+- `price_usd` — price in decimal USD, `>= 0` (default `0`).
+
+Both are required by the backend's validate and push endpoints; edit
+`graft.json` to change them.
 
 ```bash
 # 1. Generate the scaffold from an existing agent workspace.
@@ -212,7 +227,7 @@ set -e
 command -v gh >/dev/null && exit 0
 apt-get update
 apt-get install -y --no-install-recommends gh
-echo "gh" >> "/mnt/efs/agents/$AGENT_ID/.deps/apt-packages.txt"
+echo "gh" >> "/mnt/efs/instances/$INSTANCE_ID/.deps/apt-packages.txt"
 ```
 
 Runtime contract enforced by the launcher:
@@ -239,7 +254,7 @@ When **not** to use it:
   install anything it needs.
 
 The full author-facing reference is in the public docs:
-[guayaba-docs/guides/authoring-grafts.md](https://github.com/guayaba/guayaba-docs/blob/master/guides/authoring-grafts.md#optional-shipping-an-installsh-hook).
+[guayaba-docs/guides/authoring-grafts.md](https://github.com/guayabadotrun/guayaba-docs/blob/main/guides/authoring-grafts.md#optional-shipping-an-installsh-hook).
 
 ## Environment variables
 
@@ -262,8 +277,12 @@ import {
 } from '@guayaba/graft-cli';
 ```
 
-Reach into [`src/harness/`](src/harness/) for the sidecar
-machinery if you need to inline outside the CLI shell.
+The published package exposes only the exports above; `src/harness/` is
+not reachable from `node_modules` because `package.json` ships `dist/`
+only. To use the sidecar machinery outside the CLI shell, work from a
+repository checkout and import
+[`src/harness/mapping.ts`](src/harness/mapping.ts) /
+[`src/harness/sidecars.ts`](src/harness/sidecars.ts) directly.
 
 ## Development
 
