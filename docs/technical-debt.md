@@ -30,7 +30,7 @@ The push client still drains `graft.tar.gz` to a `Buffer` because Node's global 
 **File**: `package.json:3`, `package.json:21-26` (published files), `src/cli.ts:151-162` (constants pre-check), `src/graft/metadata.ts:54-55` (`tier`/`price_usd` defaults)
 **Severity**: High
 
-`npm view @guayaba/graft-cli version` reports `0.0.6` while the source tree is `0.1.1`. The published artifact predates the current CLI contract: 0.0.6 accepts `--framework` (no `--harness`) and contains neither `price_usd` nor the `GET /grafts/constants` lookup, so the behaviour the README documents for `validate`/`push` is missing from the installable package.
+`npm view @guayaba/graft-cli version` reports `0.0.6` while the source tree is `0.1.2`. The published artifact predates the current CLI contract: 0.0.6 accepts `--framework` (no `--harness`) and contains neither `price_usd` nor the `GET /grafts/constants` lookup, so the behaviour the README documents for `validate`/`push` is missing from the installable package.
 
 Fix: publish 0.1.x from the current tree, then delete the README release-state note.
 

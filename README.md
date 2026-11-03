@@ -22,7 +22,7 @@ npx @guayaba/graft-cli --help
 ```
 
 > **Release state:** npm `latest` is `0.0.6`, while this source tree is
-> `0.1.1`. The published artifact predates the `--harness` flag (0.0.6
+> `0.1.2`. The published artifact predates the `--harness` flag (0.0.6
 > still takes `--framework`), the `metadata.tier` / `metadata.price_usd`
 > fields and the `GET /grafts/constants` lookup, so every command below
 > requires 0.1.x built from this repository until 0.1.x is published.
