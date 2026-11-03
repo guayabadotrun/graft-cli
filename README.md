@@ -22,10 +22,14 @@ npx @guayaba/graft-cli --help
 ```
 
 > **Release state:** npm `latest` is `0.0.6`, while this source tree is
-> `0.1.2`. The published artifact predates the `--harness` flag (0.0.6
-> still takes `--framework`), the `metadata.tier` / `metadata.price_usd`
-> fields and the `GET /grafts/constants` lookup, so every command below
+> `0.1.2`. 0.0.6 already writes `metadata.tier`, but it predates the
+> `--harness` flag (it still takes `--framework`), the `metadata.price_usd`
+> field and the `GET /grafts/constants` lookup, so every command below
 > requires 0.1.x built from this repository until 0.1.x is published.
+>
+> The v1 constants route (`/api/v1/grafts/constants`) is not exposed by the
+> backend today, so `resolveCategorySlugs` always falls back to
+> `KNOWN_CATEGORY_SLUGS` (#5 in `docs/technical-debt.md`).
 
 ## Workflow at a glance
 
@@ -41,8 +45,10 @@ agent's workspace. The scaffold contains:
 - A copy of the workspace's `skills/` directory (and `TOOLS.md` when
   present), so the scaffold is the only input the rest of the
   pipeline needs.
-- An optional `install.sh` at the scaffold root, copied verbatim from
-  the workspace if present. The launcher runs it once on the agent's
+- An optional `install.sh` at the scaffold root, copied byte-for-byte from
+  the workspace if present (`src/harness/sidecars.ts:218`). The bundler
+  forces the mode to at least `0755` (`src/graft/bundle.ts:291-294`), so the
+  launcher can exec it even if the author forgot `chmod +x`. The launcher runs it once on the agent's
   first boot to install any binary your bundled skills depend on
   (e.g. `gh`, `aws`). See [Optional `install.sh`
   hook](#optional-installsh-hook) below.
@@ -277,10 +283,11 @@ import {
 } from '@guayaba/graft-cli';
 ```
 
-The published package exposes only the exports above; `src/harness/` is
-not reachable from `node_modules` because `package.json` ships `dist/`
-only. To use the sidecar machinery outside the CLI shell, work from a
-repository checkout and import
+The package's public surface is the full export list in
+[`src/index.ts:19-89`](src/index.ts); the block above is a subset.
+`src/harness/` is not reachable from `node_modules` because
+`package.json` ships `dist/` only. To use the sidecar machinery outside
+the CLI shell, work from a repository checkout and import
 [`src/harness/mapping.ts`](src/harness/mapping.ts) /
 [`src/harness/sidecars.ts`](src/harness/sidecars.ts) directly.
 

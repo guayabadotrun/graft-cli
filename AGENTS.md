@@ -7,7 +7,7 @@
 **Critical foot-guns:**
 - **Scaffold file is `graft.json`**, not `schema.json`. The bundle writes `schema.json` + `metadata.json` separately inside the tar.
 - **`validate` requires an API key** — the endpoint is auth-gated even though it's read-only.
-- **Only master API keys work** — the CLI does not inspect the key prefix (`resolveApiKey`, `src/cli.ts:93-108`); ownership is enforced server-side. Every Public API v1 GRAFT route runs `ValidatePublicApiKey` then `RequireMasterApiKey` (`convolution-api/app/Http/Middleware/RequireMasterApiKey.php:19-24`, `convolution-api/routes/api.php:812-818`), so a mistyped agent key fails late with a backend 401/403 instead of at startup.
+- **Only master API keys work** — the CLI does not inspect the key prefix (`resolveApiKey`, `src/cli.ts:93-108`); ownership is enforced server-side. Every Public API v1 GRAFT route runs `ValidatePublicApiKey` then `RequireMasterApiKey` (`convolution-api/app/Http/Middleware/RequireMasterApiKey.php:19-24`, `convolution-api/routes/api.php:838-845`), so a mistyped agent key fails late with a backend 401/403 instead of at startup.
 - **`augmentSchemaWithMechanicalFields` must be called before POSTing** — the form-field `schema` must match the bundle's `schema.json` exactly.
 - **`install.sh` gets at least `0755`** in the bundle — `bundle.ts` ORs the source mode with `0o755` (`src/graft/bundle.ts:291-294`), preserving any extra executable bits.
 - **`ALLOWED_GRAFT_CHANNELS = ['telegram']`** — `chat` is NOT a channel.
@@ -63,7 +63,7 @@ All commands require `--harness` (currently only `openclaw` is supported).
 | `src/api/http.ts` | Shared `requestJson` (URL join, `AbortSignal.timeout`, HTML guard, Laravel error flattening) |
 | `src/api/validateClient.ts` | `POST /grafts/validate` — auth-gated |
 | `src/api/pushClient.ts` | `POST /grafts` (multipart: `bundle`, `metadata`, `schema`) + `POST /grafts/{slug}/assets/{type}` (plain `POST`) |
-| `src/api/constantsClient.ts` | `GET /grafts/constants` — live category/harness/channel whitelists; `resolveCategorySlugs` falls back to `KNOWN_CATEGORY_SLUGS` and never throws |
+| `src/api/constantsClient.ts` | `GET /grafts/constants` — intended live category/harness/channel whitelists; the v1 route does not exist today (#5), so `resolveCategorySlugs` always falls back to `KNOWN_CATEGORY_SLUGS` and never throws |
 | `src/openclaw/workspace.ts` | Reads an OpenClaw workspace from disk |
 | `src/openclaw/extract.ts` | `extractOpenclawSummary` — produces `OpenclawAgentSummary` |
 | `src/openclaw/skills.ts` | `listInstalledSkills`, `parseSkillFrontmatter`, `tarSkillBundle`, `buildSkillManifest` |
@@ -93,13 +93,16 @@ HTTP outcomes:
 
 ### Current known debt
 
-From `docs/technical-debt.md` (November 1, 2026, 3 active items):
+From `docs/technical-debt.md` (November 3, 2026, 6 active items):
 
 | Severity | File | Issue |
 |---|---|---|
-| 🔴 High | `package.json` | npm `latest` is `0.0.6` while source is `0.1.2`; the published artifact has no `--harness`, `metadata.tier`/`price_usd` or constants lookup (#4). |
+| 🔴 High | `package.json` | npm `latest` is `0.0.6` while source is `0.1.2`; 0.0.6 has `metadata.tier` but no `--harness`, `metadata.price_usd` or constants lookup (#4). |
 | 🟠 Medium | `src/api/constantsClient.ts` | Calls `GET /grafts/constants` under `/api/v1`, but the backend route is `/api/grafts/constants`; failures are swallowed (#5). |
 | 🟠 Medium | `src/api/pushClient.ts` | Bundle drained to `Buffer` because Node `fetch` cannot compute multipart `Content-Length` for streams. Acceptable under current backend cap (#3). |
+| 🟡 Low | (repo) | No CI workflow; `npm run typecheck && npm run test` is documented as the gate but not enforced (#6). |
+| 🟡 Low | `src/api/validateClient.ts` | `validate` posts the package without `augmentSchemaWithMechanicalFields`; `push` augments first (#7). |
+| 🟡 Low | `src/api/pushClient.ts` | The backend returns `is_personal`; the CLI discards it (#8). |
 
 ## Done means
 
