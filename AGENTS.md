@@ -7,7 +7,7 @@
 **Critical foot-guns:**
 - **Scaffold file is `graft.json`**, not `schema.json`. The bundle writes `schema.json` + `metadata.json` separately inside the tar.
 - **`validate` requires an API key** — the endpoint is auth-gated even though it's read-only.
-- **Only master API keys work** — the CLI does not inspect the key prefix (`resolveApiKey`, `src/cli.ts:93-108`); ownership is enforced server-side. Every Public API v1 GRAFT route runs `ValidatePublicApiKey` then `RequireMasterApiKey` (`convolution-api/app/Http/Middleware/RequireMasterApiKey.php:19-24`, `convolution-api/routes/api.php:838-845`), so a mistyped agent key fails late with a backend 401/403 instead of at startup.
+- **Only master API keys work** — the CLI does not inspect the key prefix (`resolveApiKey`, `src/cli.ts:93-108`); ownership is enforced server-side. Every Public API v1 GRAFT route runs `ValidatePublicApiKey` then `RequireMasterApiKey` (`convolution-api/app/Http/Middleware/RequireMasterApiKey.php:19-24`, `convolution-api/routes/api.php:895-902`), so a mistyped agent key fails late with a backend 401/403 instead of at startup.
 - **`augmentSchemaWithMechanicalFields` must be called before POSTing** — the form-field `schema` must match the bundle's `schema.json` exactly.
 - **`install.sh` gets at least `0755`** in the bundle — `bundle.ts` ORs the source mode with `0o755` (`src/graft/bundle.ts:291-294`), preserving any extra executable bits.
 - **`ALLOWED_GRAFT_CHANNELS = ['telegram']`** — `chat` is NOT a channel.
@@ -73,7 +73,7 @@ All commands require `--harness` (currently only `openclaw` is supported).
 | Endpoint | Method | Auth | Content-Type |
 |---|---|---|---|
 | `/grafts/validate` | POST | `Authorization: Bearer <master_key>` | `application/json` |
-| `/grafts/constants` | GET | `Authorization: Bearer <master_key>` (optional — best-effort) | — |
+| `/grafts/constants` | GET | **Not available under `/api/v1`.** The backend only exposes the Sanctum `/api/grafts/constants` route, so this fetch fails (debt #5). | — |
 | `/grafts` | POST | `Authorization: Bearer <master_key>` | `multipart/form-data` (fields: `metadata` JSON string, `schema` JSON string, `bundle` tar.gz) |
 | `/grafts/{slug}/assets/icon` | POST | `Authorization: Bearer <master_key>` | `multipart/form-data` (field: `file` Blob) |
 | `/grafts/{slug}/assets/cover` | POST | `Authorization: Bearer <master_key>` | `multipart/form-data` (field: `file` Blob) |
@@ -93,7 +93,7 @@ HTTP outcomes:
 
 ### Current known debt
 
-From `docs/technical-debt.md` (November 3, 2026, 6 active items):
+From `docs/technical-debt.md` (November 8, 2026, 9 active items):
 
 | Severity | File | Issue |
 |---|---|---|
@@ -103,6 +103,9 @@ From `docs/technical-debt.md` (November 3, 2026, 6 active items):
 | 🟡 Low | (repo) | No CI workflow; `npm run typecheck && npm run test` is documented as the gate but not enforced (#6). |
 | 🟡 Low | `src/api/validateClient.ts` | `validate` posts the package without `augmentSchemaWithMechanicalFields`; `push` augments first (#7). |
 | 🟡 Low | `src/api/pushClient.ts` | The backend returns `is_personal`; the CLI discards it (#8). |
+| 🟡 Low | `src/cli.ts`, `src/harness/sidecars.ts` | A malformed `graft.json` surfaces a raw `TypeError` (via the top-level catch) instead of a validation error (#9). |
+| 🟡 Low | `src/harness/sidecars.ts` | Optional `TOOLS.md`/`install.sh` copies use bare `catch {}` and swallow I/O errors (#10). |
+| 🟡 Low | `src/graft/bundle.ts` | The generated README says `POST /api/grafts`; the CLI posts to `/api/v1/grafts` (#11). |
 
 ## Done means
 

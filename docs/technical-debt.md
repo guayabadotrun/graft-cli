@@ -2,7 +2,7 @@
 
 > CLI/library audit for `@guayaba/graft-cli`. Covers GRAFT scaffold generation, validation, bundling, push, assets, sidecars, and OpenClaw workspace extraction.
 >
-> **Last updated:** November 3, 2026.
+> **Last updated:** November 8, 2026 (re-verified against `56a5465`).
 
 > IDs are stable: resolved items are removed and their numbers are never reused.
 
@@ -12,8 +12,8 @@
 |---|---:|---|
 | High | 1 | Release state |
 | Medium | 2 | Memory use, wrong endpoint path |
-| Low | 3 | Missing CI, validate/push schema drift, discarded `is_personal` |
-| **Total** | **6** | |
+| Low | 6 | Missing CI, validate/push schema drift, discarded `is_personal`, malformed `graft.json` raw error (#9), optional-file copy swallows errors (#10), generated doc points at the wrong path (#11) |
+| **Total** | **9** | |
 
 ## Medium
 
@@ -36,10 +36,10 @@ Fix: publish 0.1.x from the current tree, then delete the README release-state n
 
 ### 5. `GET /grafts/constants` is called on a path the backend does not expose
 
-**File**: `src/api/constantsClient.ts:75` (`joinApiUrl('/grafts/constants')`), `src/api/http.ts:28-31` (joins onto `API_BASE_URL`), `src/config.ts:9` (`API_BASE_URL` defaults to `https://api.guayaba.run/api/v1`); backend `convolution-api/routes/api.php:344`
+**File**: `src/api/constantsClient.ts:75` (`joinApiUrl('/grafts/constants')`), `src/api/http.ts:28-31` (joins onto `API_BASE_URL`), `src/config.ts:8` (`API_BASE_URL` defaults to `https://api.guayaba.run/api/v1`); backend `convolution-api/routes/api.php:361`
 **Severity**: Medium
 
-The CLI requests `/api/v1/grafts/constants`, but the backend registers the endpoint only at `/api/grafts/constants`, inside the Sanctum-authenticated marketplace group (`routes/api.php:344`); the Public API v1 group (`routes/api.php:838-845`) exposes validate, push and assets only. The lookup therefore cannot succeed, and `resolveCategorySlugs` swallows the failure (`constantsClient.ts:145-157`), so the CLI silently falls back to `KNOWN_CATEGORY_SLUGS` and never uses the live whitelist.
+The CLI requests `/api/v1/grafts/constants`, but the backend registers the endpoint only at `/api/grafts/constants`, inside the Sanctum-authenticated marketplace group (`routes/api.php:361`); the Public API v1 group (`routes/api.php:895-902`) exposes validate, push and assets only. The lookup therefore cannot succeed, and `resolveCategorySlugs` swallows the failure (`constantsClient.ts:145-157`), so the CLI silently falls back to `KNOWN_CATEGORY_SLUGS` and never uses the live whitelist.
 
 Fix: point the client at a route that exists — either add the constants endpoint to the master-key v1 group or call `/api/grafts/constants` with the right auth — and surface a warning when the live list is unavailable instead of falling back silently.
 
@@ -47,7 +47,7 @@ Fix: point the client at a route that exists — either add the constants endpoi
 
 ### 6. No CI despite the documented gate
 
-**Files**: no `.github/` directory; `package.json:27-33` (scripts); `AGENTS.md:107-109` ("Done means")
+**Files**: no `.github/` directory; `package.json:27-33` (scripts); `AGENTS.md:110-113` ("Done means")
 
 **Severity**: Low
 
@@ -74,4 +74,36 @@ Fix: apply `augmentSchemaWithMechanicalFields` in `validateGraftPackage` before 
 The backend returns `data.is_personal` on a successful push, but the CLI's `PushResult` only maps `id`, `slug`, `version`, `version_id`, `bundle_s3_key` and `assets`, so callers cannot tell a personal draft from a shared bundle.
 
 Fix: add `isPersonal` to `PushResult` and populate it from `data.is_personal`.
+
+## Newly identified (2026-11-08)
+
+### 9. A malformed `graft.json` surfaces a raw `TypeError`
+
+**Files**: `src/cli.ts:59,75-86,492`, `src/harness/sidecars.ts:33,43,49`
+
+**Severity**: Low
+
+`readGraftEnvelope()` only checks that `metadata` and `schema` keys exist (`cli.ts:75-86`). `inlineSidecars()` then spreads `schema.harness_constraints` and maps `schema.fields` (`sidecars.ts:43,49`) without checking that they are arrays, so a hand-edited envelope missing either key throws a `TypeError`. The top-level `cli.ts:492` `.catch` turns it into `console.error(err.message); process.exit(1)`, so it is not an unhandled crash, but the user sees a raw TypeError instead of a clear validation error.
+
+Fix: validate the envelope shape (`metadata`/`schema` objects, `harness_constraints`/`fields` arrays) before any sidecar work and fail with a `graft.json is not a valid GRAFT envelope` message.
+
+### 10. Optional-file copies swallow every error
+
+**Files**: `src/harness/sidecars.ts:200-222`
+
+**Severity**: Low
+
+`TOOLS.md` and `install.sh` are copied with bare `catch {}` blocks (`sidecars.ts:207,220`). A permission or I/O failure is reported as "absent" instead of surfacing, so a scaffold can silently omit a file the author expected to ship.
+
+Fix: only treat `ENOENT` as absent; rethrow (or warn) on other errors.
+
+### 11. The generated bundle README names the wrong push path
+
+**Files**: `src/graft/bundle.ts:468`, `src/api/pushClient.ts:275`, `src/config.ts:8`
+
+**Severity**: Low
+
+The scaffold README renders "This calls `POST /api/grafts` with your master API key" (`bundle.ts:468`), while the CLI actually posts to `${API_BASE_URL}/grafts` (`pushClient.ts:275`) with the default base `https://api.guayaba.run/api/v1` (`config.ts:8`). Authors following the generated README hit the Sanctum route instead of the public v1 route.
+
+Fix: render the actual v1 path (or derive it from `API_BASE_URL`).
 
