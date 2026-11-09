@@ -28,7 +28,7 @@ function pkg(): GraftPackage {
     schema: {
       schema_version: 2,
       harness_constraints: ['openclaw'],
-      defaults: { channels: ['telegram'] },
+      defaults: {},
       fields: [],
     },
   };

@@ -27,9 +27,9 @@ export interface FieldMapping {
 
 /**
  * Static registry. Add a new harness by appending an entry. Each entry
- * lists ONLY the markdown-backed fields; structured config (channels,
- * model, thinking, skills) is read from the harness's own config file
- * by a separate per-harness extractor.
+ * lists ONLY the markdown-backed fields; structured config (model,
+ * thinking, skills) is read from the harness's own config file by a
+ * separate per-harness extractor.
  */
 export const FRAMEWORK_MAPPINGS: Record<HarnessSlug, ReadonlyArray<FieldMapping>> = {
   openclaw: [

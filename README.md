@@ -108,10 +108,8 @@ Options:
 
 Behaviour:
 
-- Reads the workspace, builds the structural schema (channels, model,
-  thinking) via the harness-specific extractor. **Channel constraint
-  (openclaw):** only `telegram` is supported in `defaults.channels`.
-  Specifying any other channel will cause `init` to exit with an error.
+- Reads the workspace, builds the structural schema (model, thinking) via the
+  harness-specific extractor.
 - Asks for marketplace metadata interactively (slug, name, description,
   version, tags, categories, author).
 - Creates a sidecar stub for each mapped field (`personality.md`,

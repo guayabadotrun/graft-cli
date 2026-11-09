@@ -93,7 +93,7 @@ const META: GraftMetadata = {
 const SCHEMA: GraftDocument = {
   schema_version: 2,
   harness_constraints: ['openclaw'],
-  defaults: { channels: ['telegram'] },
+  defaults: {},
   fields: [],
 };
 

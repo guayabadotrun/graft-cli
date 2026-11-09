@@ -6,7 +6,7 @@ function summary(name: string | undefined): OpenclawAgentSummary {
   return {
     harness: 'openclaw',
     agent: name === undefined ? {} : { id: 'agt_1', name },
-    universal: { channels: [], skills: [] },
+    universal: { skills: [] },
     rawMarkdown: {},
   };
 }

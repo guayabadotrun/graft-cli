@@ -234,7 +234,7 @@ program
       }
       await mkdir(scaffoldDir, { recursive: true });
 
-      // 3) Build the structural schema (channels, model, thinking).
+      // 3) Build the structural schema (model, thinking).
       let doc: GraftDocument;
       try {
         doc = buildGraftFromOpenclaw(summary);
@@ -300,9 +300,6 @@ program
       }
       if (summary.universal.model) console.log(`  model:     ${summary.universal.model}`);
       if (summary.universal.thinking) console.log(`  thinking:  ${summary.universal.thinking}`);
-      if (summary.universal.channels.length > 0) {
-        console.log(`  channels:  ${summary.universal.channels.join(', ')}`);
-      }
       console.log('');
       console.log('Files:');
       console.log('  graft.json          ← main file: edit metadata + schema fields here');

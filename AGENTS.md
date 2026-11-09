@@ -10,7 +10,6 @@
 - **Only master API keys work** — the CLI does not inspect the key prefix (`resolveApiKey`, `src/cli.ts:93-108`); ownership is enforced server-side. Every Public API v1 GRAFT route runs `ValidatePublicApiKey` then `RequireMasterApiKey` (`convolution-api/app/Http/Middleware/RequireMasterApiKey.php:19-24`, `convolution-api/routes/api.php:895-902`), so a mistyped agent key fails late with a backend 401/403 instead of at startup.
 - **`augmentSchemaWithMechanicalFields` must be called before POSTing** — the form-field `schema` must match the bundle's `schema.json` exactly.
 - **`install.sh` gets at least `0755`** in the bundle — `bundle.ts` ORs the source mode with `0o755` (`src/graft/bundle.ts:291-294`), preserving any extra executable bits.
-- **`ALLOWED_GRAFT_CHANNELS = ['telegram']`** — `chat` is NOT a channel.
 - **`schema_version: 2` only** — any other value (including the string `"2"`) is rejected by the backend.
 - **`$GUAYABA_API_BASE_URL`** overrides the default API URL — env-only, intentionally no CLI flag.
 
@@ -57,7 +56,7 @@ All commands require `--harness` (currently only `openclaw` is supported).
 | `src/config.ts` | Exports `API_BASE_URL` — defaults to `https://api.guayaba.run/api/v1`, overridable via `$GUAYABA_API_BASE_URL` |
 | `src/harness/mapping.ts` | Static registry: `HarnessSlug`, `FRAMEWORK_MAPPINGS` (historical name), scaffold filename ↔ workspace filename → `defaults` dot-path table |
 | `src/harness/sidecars.ts` | `inlineSidecars`, `copyWorkspaceSidecars`, `copyWorkspaceSkills` |
-| `src/graft/build.ts` | Pure builder: OpenClaw summary → `GraftDocument` (`schema_version: 2`); defines `ALLOWED_GRAFT_CHANNELS` |
+| `src/graft/build.ts` | Pure builder: OpenClaw summary → `GraftDocument` (`schema_version: 2`) |
 | `src/graft/bundle.ts` | Assembles `graft.tar.gz` via `tar` child process; stages in `os.tmpdir()` |
 | `src/graft/scaffoldFields.ts` | `augmentSchemaWithMechanicalFields` — attaches `materialize` blocks to `secret` fields; `KNOWN_MATERIALIZERS` is currently empty `{}` |
 | `src/api/http.ts` | Shared `requestJson` (URL join, `AbortSignal.timeout`, HTML guard, Laravel error flattening) |

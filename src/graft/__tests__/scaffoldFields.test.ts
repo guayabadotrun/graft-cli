@@ -6,7 +6,7 @@ import type { GraftDocument, GraftField } from '../build.js';
 const baseSchema: GraftDocument = {
   schema_version: 2,
   harness_constraints: ['openclaw'],
-  defaults: { channels: ['telegram'] },
+  defaults: {},
   fields: [],
 };
 
@@ -53,7 +53,7 @@ describe('augmentSchemaWithMechanicalFields', () => {
       fields: [authorField],
     });
     expect(augmented.fields).toHaveLength(1);
-    expect(augmented.fields[0].materialize).toBeUndefined();
+    expect(augmented.fields[0]!.materialize).toBeUndefined();
   });
 
   it('does NOT overwrite an author-declared materialize block', () => {
@@ -74,7 +74,7 @@ describe('augmentSchemaWithMechanicalFields', () => {
       ...baseSchema,
       fields: [authorField],
     });
-    expect(augmented.fields[0].materialize).toBe(customMaterialize);
+    expect(augmented.fields[0]!.materialize).toBe(customMaterialize);
   });
 
   it('does NOT attach materialize for unknown env keys', () => {
@@ -89,7 +89,7 @@ describe('augmentSchemaWithMechanicalFields', () => {
       ...baseSchema,
       fields: [authorField],
     });
-    expect(augmented.fields[0].materialize).toBeUndefined();
+    expect(augmented.fields[0]!.materialize).toBeUndefined();
   });
 
   it('does NOT derive a TELEGRAM_BOT_TOKEN field from the telegram channel (the channel UI owns it)', () => {
@@ -104,7 +104,7 @@ describe('augmentSchemaWithMechanicalFields', () => {
     const input: GraftDocument = {
       schema_version: 2,
       harness_constraints: ['openclaw'],
-      defaults: { channels: ['telegram'] },
+      defaults: {},
       fields: [
         {
           id: 'github_token',

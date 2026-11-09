@@ -4,7 +4,6 @@
 // fields we can infer *unambiguously* from the on-disk config:
 //   - agent identity (id, name) from `agents.list[0]`
 //   - model + thinking from `agents.defaults`
-//   - active channels from `channels.*`
 //
 // Notably we DO NOT try to derive `bio` / `knowledge` /
 // `extra_instructions` from SOUL.md or MEMORY.md. Those files are
@@ -34,8 +33,6 @@ export interface OpenclawAgentSummary {
     /** Model id without the provider prefix, e.g. `anthropic/claude-sonnet-4.6`. */
     model?: string;
     thinking?: ThinkingLevel;
-    /** Channel slugs detected in `openclaw.json` `channels.*`. */
-    channels: string[];
     /**
      * Skill slugs declared in `agents.defaults.skills`. Today our
      * launcher does not write this field, so the array will almost
@@ -107,13 +104,6 @@ export function extractOpenclawSummary(workspace: OpenclawWorkspace): OpenclawAg
   const thinking: ThinkingLevel | undefined =
     rawThinking && THINKING_LEVELS.has(rawThinking) ? (rawThinking as ThinkingLevel) : undefined;
 
-  const channelsBlock = asRecord(config.channels) ?? {};
-  const channels = Object.keys(channelsBlock)
-    // Defensive: only count entries whose value is an object (a real
-    // channel config), not stray nulls or booleans.
-    .filter((slug) => asRecord(channelsBlock[slug]))
-    .sort();
-
   const skills = asStringArray(defaults.skills);
 
   return {
@@ -125,7 +115,6 @@ export function extractOpenclawSummary(workspace: OpenclawWorkspace): OpenclawAg
     universal: {
       ...(model !== undefined ? { model } : {}),
       ...(thinking !== undefined ? { thinking } : {}),
-      channels,
       skills,
     },
     rawMarkdown: workspace.markdown,

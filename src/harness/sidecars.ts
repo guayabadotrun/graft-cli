@@ -43,7 +43,6 @@ export async function inlineSidecars(
     harness_constraints: [...schema.harness_constraints],
     defaults: {
       ...schema.defaults,
-      ...(schema.defaults.channels ? { channels: [...schema.defaults.channels] } : {}),
       ...(schema.defaults.settings ? { settings: { ...schema.defaults.settings } } : {}),
     },
     fields: schema.fields.map((f) => ({ ...f })),

@@ -34,21 +34,17 @@ function realisticConfig(): unknown {
         },
       ],
     },
-    channels: {
-      telegram: { botToken: '${TELEGRAM_BOT_TOKEN}', dmPolicy: 'pairing' },
-    },
   };
 }
 
 describe('extractOpenclawSummary', () => {
-  it('extracts identity, model, thinking and channels from a realistic config', () => {
+  it('extracts identity, model and thinking from a realistic config', () => {
     const summary = extractOpenclawSummary(makeWorkspace(realisticConfig()));
 
     expect(summary.harness).toBe('openclaw');
     expect(summary.agent).toEqual({ id: 'agent-uuid', name: 'Halibut' });
     expect(summary.universal.model).toBe('anthropic/claude-sonnet-4.6');
     expect(summary.universal.thinking).toBe('medium');
-    expect(summary.universal.channels).toEqual(['telegram']);
     expect(summary.universal.skills).toEqual([]);
   });
 
@@ -74,14 +70,6 @@ describe('extractOpenclawSummary', () => {
     expect(summary.universal.thinking).toBeUndefined();
   });
 
-  it('returns an empty channel list when no channels block is present', () => {
-    const cfg = realisticConfig() as any;
-    delete cfg.channels;
-
-    const summary = extractOpenclawSummary(makeWorkspace(cfg));
-    expect(summary.universal.channels).toEqual([]);
-  });
-
   it('reads skills defensively from agents.defaults.skills when present', () => {
     const cfg = realisticConfig() as any;
     cfg.agents.defaults.skills = ['github', 'web-search', 42, null];
@@ -97,14 +85,13 @@ describe('extractOpenclawSummary', () => {
     expect(summary).toEqual({
       harness: 'openclaw',
       agent: {},
-      universal: { channels: [], skills: [] },
+      universal: { skills: [] },
       rawMarkdown: {},
     });
   });
 
   it('does not throw when given a config that is not even an object', () => {
     const summary = extractOpenclawSummary(makeWorkspace('not a config'));
-    expect(summary.universal.channels).toEqual([]);
     expect(summary.agent).toEqual({});
   });
 });

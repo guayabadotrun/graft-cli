@@ -10,7 +10,7 @@
 //   - `harness_constraints: ['openclaw']` so the marketplace knows
 //     which harnesses can apply this template
 //   - `defaults` carrying only the keys we could read unambiguously
-//     (channels, llm_provider_model, settings.thinking)
+//     (llm_provider_model, settings.thinking)
 //   - `fields: []` — this baseline has no custom user inputs; richer
 //     templates will be authored by hand or by later iterations of
 //     the prompts layer
@@ -22,18 +22,6 @@
 //   - `steps` — only used by hand-authored advanced templates
 
 import type { OpenclawAgentSummary, ThinkingLevel } from '../openclaw/extract.js';
-
-/**
- * Channels that may appear in `defaults.channels[]` of a v2 GRAFT.
- *
- * Mirrors `GraftSchemaValidator::ALLOWED_GRAFT_CHANNELS` in the backend
- * (convolution-api). `chat` is intentionally excluded — it's the always-on
- * gateway transport, not a channel. Adding a channel here MUST be
- * paired with the launcher learning to wire it AND the matching PHP
- * constant.
- */
-export const ALLOWED_GRAFT_CHANNELS = ['telegram'] as const;
-export type AllowedGraftChannel = typeof ALLOWED_GRAFT_CHANNELS[number];
 
 /**
  * Minimal structural typing for what we emit. The marketplace spec
@@ -51,7 +39,6 @@ export interface GraftDefaults {
   personality?: string;
   vibe?: string;
   knowledge_seed?: string[];
-  channels?: string[];
   llm_provider_model?: string;
   settings?: {
     thinking?: ThinkingLevel;
@@ -79,20 +66,6 @@ export type GraftField = Record<string, unknown>;
 
 export function buildGraftFromOpenclaw(summary: OpenclawAgentSummary): GraftDocument {
   const defaults: GraftDefaults = {};
-
-  if (summary.universal.channels.length > 0) {
-    const unsupported = summary.universal.channels.filter(
-      (c) => !(ALLOWED_GRAFT_CHANNELS as readonly string[]).includes(c),
-    );
-    if (unsupported.length > 0) {
-      throw new Error(
-        `GRAFT defaults.channels contains unsupported channel(s): ${unsupported.join(', ')}. ` +
-          `Allowed: ${ALLOWED_GRAFT_CHANNELS.join(', ')}. ` +
-          `Note: 'chat' is not a channel — it is the always-on transport.`,
-      );
-    }
-    defaults.channels = [...summary.universal.channels];
-  }
 
   const settings: NonNullable<GraftDefaults['settings']> = {};
   if (summary.universal.model !== undefined) {

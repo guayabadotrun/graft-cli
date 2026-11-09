@@ -18,7 +18,6 @@ const DATA = {
   validation_keys: ['max_length'],
   predicate_operators: ['eq'],
   owned_by_prefixes: ['user.'],
-  graft_channels: ['telegram'],
   category_slugs: ['productivity', 'dev'],
   harness_slugs: ['openclaw'],
 };
@@ -46,7 +45,6 @@ describe('fetchGraftConstants', () => {
     const constants = await fetchGraftConstants({ apiKey: 'g_master_123', fetchImpl });
 
     expect(constants.category_slugs).toEqual(['productivity', 'dev']);
-    expect(constants.graft_channels).toEqual(['telegram']);
     expect(constants.harness_slugs).toEqual(['openclaw']);
     const [url, init] = spy.mock.calls[0]!;
     expect(url).toBe(EXPECTED_URL);
