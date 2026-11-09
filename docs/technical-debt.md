@@ -36,10 +36,10 @@ Fix: publish 0.1.x from the current tree, then delete the README release-state n
 
 ### 5. `GET /grafts/constants` is called on a path the backend does not expose
 
-**File**: `src/api/constantsClient.ts:75` (`joinApiUrl('/grafts/constants')`), `src/api/http.ts:28-31` (joins onto `API_BASE_URL`), `src/config.ts:8` (`API_BASE_URL` defaults to `https://api.guayaba.run/api/v1`); backend `convolution-api/routes/api.php:361`
+**File**: `src/api/constantsClient.ts:75` (`joinApiUrl('/grafts/constants')`), `src/api/http.ts:28-31` (joins onto `API_BASE_URL`), `src/config.ts:8` (`API_BASE_URL` defaults to `https://api.guayaba.run/api/v1`); backend `convolution-api/routes/api.php:364`
 **Severity**: Medium
 
-The CLI requests `/api/v1/grafts/constants`, but the backend registers the endpoint only at `/api/grafts/constants`, inside the Sanctum-authenticated marketplace group (`routes/api.php:361`); the Public API v1 group (`routes/api.php:895-902`) exposes validate, push and assets only. The lookup therefore cannot succeed, and `resolveCategorySlugs` swallows the failure (`constantsClient.ts:145-157`), so the CLI silently falls back to `KNOWN_CATEGORY_SLUGS` and never uses the live whitelist.
+The CLI requests `/api/v1/grafts/constants`, but the backend registers the endpoint only at `/api/grafts/constants`, inside the Sanctum-authenticated marketplace group (`routes/api.php:364`); the Public API v1 group (`routes/api.php:900-907`) exposes validate, push and assets only. The lookup therefore cannot succeed, and `resolveCategorySlugs` swallows the failure (`constantsClient.ts:145-157`), so the CLI silently falls back to `KNOWN_CATEGORY_SLUGS` and never uses the live whitelist.
 
 Fix: point the client at a route that exists — either add the constants endpoint to the master-key v1 group or call `/api/grafts/constants` with the right auth — and surface a warning when the live list is unavailable instead of falling back silently.
 
