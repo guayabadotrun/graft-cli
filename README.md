@@ -22,10 +22,10 @@ npx @guayaba/graft-cli --help
 ```
 
 > **Release state:** npm `latest` is `0.0.6`, while this source tree is
-> `0.1.2`. 0.0.6 already writes `metadata.tier`, but it predates the
+> `0.2.0`. 0.0.6 already writes `metadata.tier`, but it predates the
 > `--harness` flag (it still takes `--framework`), the `metadata.price_usd`
 > field and the `GET /grafts/constants` lookup, so every command below
-> requires 0.1.x built from this repository until 0.1.x is published.
+> requires 0.2.x built from this repository until 0.2.x is published.
 >
 > The v1 constants route (`/api/v1/grafts/constants`) is not exposed by the
 > backend today, so `resolveCategorySlugs` always falls back to

@@ -96,7 +96,7 @@ From `docs/technical-debt.md` (November 8, 2026, 9 active items):
 
 | Severity | File | Issue |
 |---|---|---|
-| 🔴 High | `package.json` | npm `latest` is `0.0.6` while source is `0.1.2`; 0.0.6 has `metadata.tier` but no `--harness`, `metadata.price_usd` or constants lookup (#4). |
+| 🔴 High | `package.json` | npm `latest` is `0.0.6` while source is `0.2.0`; 0.0.6 has `metadata.tier` but no `--harness`, `metadata.price_usd` or constants lookup (#4). |
 | 🟠 Medium | `src/api/constantsClient.ts` | Calls `GET /grafts/constants` under `/api/v1`, but the backend route is `/api/grafts/constants`; failures are swallowed (#5). |
 | 🟠 Medium | `src/api/pushClient.ts` | Bundle drained to `Buffer` because Node `fetch` cannot compute multipart `Content-Length` for streams. Acceptable under current backend cap (#3). |
 | 🟡 Low | (repo) | No CI workflow; `npm run typecheck && npm run test` is documented as the gate but not enforced (#6). |
