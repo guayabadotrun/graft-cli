@@ -7,9 +7,9 @@
 **Critical foot-guns:**
 - **Scaffold file is `graft.json`**, not `schema.json`. The bundle writes `schema.json` + `metadata.json` separately inside the tar.
 - **`validate` requires an API key** — the endpoint is auth-gated even though it's read-only.
-- **Only master API keys work** — the CLI does not inspect the key prefix (`resolveApiKey`, `src/cli.ts:93-108`); ownership is enforced server-side. Every Public API v1 GRAFT route runs `ValidatePublicApiKey` then `RequireMasterApiKey` (`convolution-api/app/Http/Middleware/RequireMasterApiKey.php:19-24`, `convolution-api/routes/api.php:895-902`), so a mistyped agent key fails late with a backend 401/403 instead of at startup.
+- **Only master API keys work** — the CLI does not inspect the key prefix (`resolveApiKey`, `src/cli.ts:93-108`); ownership is enforced server-side. Every Public API v1 GRAFT route runs `ValidatePublicApiKey` then `RequireMasterApiKey` (`convolution-api/app/Http/Middleware/RequireMasterApiKey.php:19-24`, `convolution-api/routes/api.php:893-900`), so a mistyped agent key fails late with a backend 401/403 instead of at startup.
 - **`augmentSchemaWithMechanicalFields` must be called before POSTing** — the form-field `schema` must match the bundle's `schema.json` exactly.
-- **`install.sh` gets at least `0755`** in the bundle — `bundle.ts` ORs the source mode with `0o755` (`src/graft/bundle.ts:291-294`), preserving any extra executable bits.
+- **`install.sh` is legacy and ignored by launchers** — the bundler still force-chmods it to at least `0755` (`src/graft/bundle.ts:291-294`), but it is not executed. Binary/runtime setup is not a GRAFT hook.
 - **`schema_version: 2` only** — any other value (including the string `"2"`) is rejected by the backend.
 - **`$GUAYABA_API_BASE_URL`** overrides the default API URL — env-only, intentionally no CLI flag.
 
@@ -62,7 +62,7 @@ All commands require `--harness` (currently only `openclaw` is supported).
 | `src/api/http.ts` | Shared `requestJson` (URL join, `AbortSignal.timeout`, HTML guard, Laravel error flattening) |
 | `src/api/validateClient.ts` | `POST /grafts/validate` — auth-gated |
 | `src/api/pushClient.ts` | `POST /grafts` (multipart: `bundle`, `metadata`, `schema`) + `POST /grafts/{slug}/assets/{type}` (plain `POST`) |
-| `src/api/constantsClient.ts` | `GET /grafts/constants` — intended live category/harness/channel whitelists; the v1 route does not exist today (#5), so `resolveCategorySlugs` always falls back to `KNOWN_CATEGORY_SLUGS` and never throws |
+| `src/api/constantsClient.ts` | `GET /grafts/constants` — intended live category/harness whitelists; the v1 route does not exist today (#5), so `resolveCategorySlugs` always falls back to `KNOWN_CATEGORY_SLUGS` and never throws |
 | `src/openclaw/workspace.ts` | Reads an OpenClaw workspace from disk |
 | `src/openclaw/extract.ts` | `extractOpenclawSummary` — produces `OpenclawAgentSummary` |
 | `src/openclaw/skills.ts` | `listInstalledSkills`, `parseSkillFrontmatter`, `tarSkillBundle`, `buildSkillManifest` |
@@ -92,12 +92,14 @@ HTTP outcomes:
 
 ### Current known debt
 
-From `docs/technical-debt.md` (November 8, 2026, 9 active items):
+From `docs/technical-debt.md` (November 12, 2026, 12 active items):
 
 | Severity | File | Issue |
 |---|---|---|
 | 🔴 High | `package.json` | npm `latest` is `0.0.6` while source is `0.2.0`; 0.0.6 has `metadata.tier` but no `--harness`, `metadata.price_usd` or constants lookup (#4). |
+| 🔴 High | `src/graft/bundle.ts` | Generated bundle README still says `install.sh` runs on first apply; the launcher ignores it (#12). |
 | 🟠 Medium | `src/api/constantsClient.ts` | Calls `GET /grafts/constants` under `/api/v1`, but the backend route is `/api/grafts/constants`; failures are swallowed (#5). |
+| 🟠 Medium | `src/graft/bundle.ts` | Generated README documents `type: command` materializers the launcher drops (#13). |
 | 🟠 Medium | `src/api/pushClient.ts` | Bundle drained to `Buffer` because Node `fetch` cannot compute multipart `Content-Length` for streams. Acceptable under current backend cap (#3). |
 | 🟡 Low | (repo) | No CI workflow; `npm run typecheck && npm run test` is documented as the gate but not enforced (#6). |
 | 🟡 Low | `src/api/validateClient.ts` | `validate` posts the package without `augmentSchemaWithMechanicalFields`; `push` augments first (#7). |
@@ -105,6 +107,7 @@ From `docs/technical-debt.md` (November 8, 2026, 9 active items):
 | 🟡 Low | `src/cli.ts`, `src/harness/sidecars.ts` | A malformed `graft.json` surfaces a raw `TypeError` (via the top-level catch) instead of a validation error (#9). |
 | 🟡 Low | `src/harness/sidecars.ts` | Optional `TOOLS.md`/`install.sh` copies use bare `catch {}` and swallow I/O errors (#10). |
 | 🟡 Low | `src/graft/bundle.ts` | The generated README says `POST /api/grafts`; the CLI posts to `/api/v1/grafts` (#11). |
+| 🟡 Low | `src/graft/bundle.ts` | The generated README documents legacy `BEGIN/END MANAGED` markers instead of `@guayaba:slot` (#14). |
 
 ## Done means
 

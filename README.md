@@ -9,6 +9,20 @@ everything needed to reproduce an agent — its system prompt, skills,
 model settings, and metadata — so it can be shared and reinstalled from
 the Guayaba marketplace.
 
+> **Release state:** npm `latest` is `0.0.6`, while this source tree is
+> `0.2.0`. 0.0.6 emits `framework_constraints`, `framework_slugs`,
+> `price_credits` and `defaults.channels`, and cannot pass the current backend
+> validator, which requires `metadata.harness_slugs` and
+> `metadata.price_usd` (`convolution-api/app/Http/Requests/Graft/PushGraftRequest.php:123,128`).
+> It also predates the `--harness` flag (it still takes `--framework`) and the
+> `GET /grafts/constants` lookup. Every command below requires 0.2.x built
+> from this repository until 0.2.x is published — do not treat the global
+> install as the working path.
+>
+> The v1 constants route (`/api/v1/grafts/constants`) is not exposed by the
+> backend today, so `resolveCategorySlugs` always falls back to
+> `KNOWN_CATEGORY_SLUGS` (#5 in `docs/technical-debt.md`).
+
 ## Install
 
 ```bash
@@ -21,15 +35,8 @@ Or run on demand:
 npx @guayaba/graft-cli --help
 ```
 
-> **Release state:** npm `latest` is `0.0.6`, while this source tree is
-> `0.2.0`. 0.0.6 already writes `metadata.tier`, but it predates the
-> `--harness` flag (it still takes `--framework`), the `metadata.price_usd`
-> field and the `GET /grafts/constants` lookup, so every command below
-> requires 0.2.x built from this repository until 0.2.x is published.
->
-> The v1 constants route (`/api/v1/grafts/constants`) is not exposed by the
-> backend today, so `resolveCategorySlugs` always falls back to
-> `KNOWN_CATEGORY_SLUGS` (#5 in `docs/technical-debt.md`).
+Until 0.2.x is published, use a checkout of this repository
+(`npm install && npm run build`) instead of the published package.
 
 ## Workflow at a glance
 
@@ -45,13 +52,10 @@ agent's workspace. The scaffold contains:
 - A copy of the workspace's `skills/` directory (and `TOOLS.md` when
   present), so the scaffold is the only input the rest of the
   pipeline needs.
-- An optional `install.sh` at the scaffold root, copied byte-for-byte from
-  the workspace if present (`src/harness/sidecars.ts:218`). The bundler
-  forces the mode to at least `0755` (`src/graft/bundle.ts:291-294`), so the
-  launcher can exec it even if the author forgot `chmod +x`. The launcher runs it once on the agent's
-  first boot to install any binary your bundled skills depend on
-  (e.g. `gh`, `aws`). See [Optional `install.sh`
-  hook](#optional-installsh-hook) below.
+- A legacy `install.sh` at the scaffold root, copied byte-for-byte from the
+  workspace if present (`src/harness/sidecars.ts:217-218`). Current launchers
+  ignore it — binary/runtime setup is no longer a GRAFT hook. See
+  [Legacy `install.sh`](#legacy-installsh) below.
 
 `graft.json`'s `metadata` also carries two marketplace fields that `init`
 writes with defaults and never prompts for:
@@ -87,7 +91,7 @@ Global flags available on the root `graft` command:
 
 ```
   -v, --version   Print the installed version and exit.
-      --help      Print help.
+  -h, --help      Print help.
 ```
 
 ## Commands
@@ -110,14 +114,13 @@ Behaviour:
 
 - Reads the workspace, builds the structural schema (model, thinking) via the
   harness-specific extractor.
-- Asks for marketplace metadata interactively (slug, name, description,
-  version, tags, categories, author).
+- Asks for marketplace metadata interactively (name, slug, short_description,
+  description, version, tags, categories, author).
 - Creates a sidecar stub for each mapped field (`personality.md`,
   `vibe.md`, `extra_instructions.md` for openclaw). Each stub contains
   only an instructional HTML comment; the author writes the template
-  content themselves. Workspace content is intentionally not copied —
-  copying verbatim would duplicate the text when the GRAFT is applied,
-  because the harness combines personality and extra_instructions.
+  content themselves. Workspace content is intentionally not copied — the
+  stubs are the template, not the live agent text.
 - Copies the workspace's installed skills into `<scaffold>/skills/`,
   flattening `<workspace>/skills/` and `<workspace>/.agents/skills/`
   into a single tree. Also copies `TOOLS.md` if present. The scaffold
@@ -213,52 +216,19 @@ The registry lives in
 [`src/harness/mapping.ts`](src/harness/mapping.ts); the inlining
 logic lives in [`src/harness/sidecars.ts`](src/harness/sidecars.ts).
 
-## Optional `install.sh` hook
+## Legacy `install.sh`
 
-If the source workspace has an `install.sh` at its root,
-`graft init` copies it into the scaffold and `graft pack` / `graft
-push` ship it inside the bundle. The launcher (openclaw-launcher's
-`graft-apply.ts`) then runs it **once** on the agent's first boot.
+Older bundles may still carry an `install.sh`, but current launchers ignore
+it. Binary/runtime setup is no longer a GRAFT hook: apt packages are replayed
+from `.deps/apt-packages.txt` by the container entrypoint on the next start,
+and the agent installs user-space tools under its workspace/HOME. The agent
+runs as the non-root runtime user, so `apt-get` is not available at runtime
+(`openclaw-launcher/src/openclaw/generator.ts:1369-1373,1473-1474`;
+`gene-seed/internal/grafts/marketplace.md:119-124`).
 
-Use it for **runtime binary setup** that can't be expressed
-declaratively — typically installing a CLI your bundled skill depends
-on:
-
-```sh
-#!/bin/sh
-# Make `gh` available so the bundled `github` skill can use it.
-set -e
-command -v gh >/dev/null && exit 0
-apt-get update
-apt-get install -y --no-install-recommends gh
-echo "gh" >> "/mnt/efs/instances/$INSTANCE_ID/.deps/apt-packages.txt"
-```
-
-Runtime contract enforced by the launcher:
-
-- Invocation: `/bin/sh install.sh`, working dir is the bundle's
-  extract dir.
-- Runs as root inside the agent container; `apt-get install -y`
-  works without sudo.
-- Hard timeout: 5 minutes (SIGKILL on overrun).
-- stdout → launcher logs at `info`, stderr at `warn`.
-- Non-zero exit aborts the apply and the marker is not written, so
-  the launcher retries on next boot. Use `set -e`.
-- Must be idempotent.
-
-When **not** to use it:
-
-- Per-user secrets → declare a `secret` field inside the `schema`
-  object in `graft.json` with a `materialize` block. `materialize`
-  re-runs on every boot/reload to follow rotations; `install.sh`
-  runs only once.
-- Things the agent will install on demand anyway → if the cost of one
-  user message waiting on `apt-get install` is acceptable, skip the
-  hook entirely. The agent template tells the LLM it has root and can
-  install anything it needs.
-
-The full author-facing reference is in the public docs:
-[guayaba-docs/guides/authoring-grafts.md](https://github.com/guayabadotrun/guayaba-docs/blob/main/guides/authoring-grafts.md#optional-shipping-an-installsh-hook).
+Do not rely on `install.sh` for anything. Per-user secrets belong in a
+`secret` field's `materialize` block; binaries the agent needs at runtime
+should be installed by the agent under its workspace/HOME.
 
 ## Environment variables
 

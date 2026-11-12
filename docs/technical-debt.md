@@ -2,7 +2,7 @@
 
 > CLI/library audit for `@guayaba/graft-cli`. Covers GRAFT scaffold generation, validation, bundling, push, assets, sidecars, and OpenClaw workspace extraction.
 >
-> **Last updated:** November 8, 2026 (re-verified against `56a5465`).
+> **Last updated:** November 12, 2026 (re-verified against `4a9ede6`).
 
 > IDs are stable: resolved items are removed and their numbers are never reused.
 
@@ -10,10 +10,10 @@
 
 | Severity | Active | Main categories |
 |---|---:|---|
-| High | 1 | Release state |
-| Medium | 2 | Memory use, wrong endpoint path |
-| Low | 6 | Missing CI, validate/push schema drift, discarded `is_personal`, malformed `graft.json` raw error (#9), optional-file copy swallows errors (#10), generated doc points at the wrong path (#11) |
-| **Total** | **9** | |
+| High | 2 | Release state, install.sh documented as a live hook (#12) |
+| Medium | 3 | Memory use, wrong endpoint path, command materializers (#13) |
+| Low | 7 | Missing CI, validate/push schema drift, discarded `is_personal`, malformed `graft.json` raw error (#9), optional-file copy swallows errors (#10), generated doc points at the wrong path (#11), legacy managed markers (#14) |
+| **Total** | **12** | |
 
 ## Medium
 
@@ -36,10 +36,10 @@ Fix: publish 0.2.x from the current tree, then delete the README release-state n
 
 ### 5. `GET /grafts/constants` is called on a path the backend does not expose
 
-**File**: `src/api/constantsClient.ts:75` (`joinApiUrl('/grafts/constants')`), `src/api/http.ts:28-31` (joins onto `API_BASE_URL`), `src/config.ts:8` (`API_BASE_URL` defaults to `https://api.guayaba.run/api/v1`); backend `convolution-api/routes/api.php:364`
+**File**: `src/api/constantsClient.ts:73` (`joinApiUrl('/grafts/constants')`), `src/api/http.ts:28-31` (joins onto `API_BASE_URL`), `src/config.ts:8` (`API_BASE_URL` defaults to `https://api.guayaba.run/api/v1`); backend `convolution-api/routes/api.php:367`
 **Severity**: Medium
 
-The CLI requests `/api/v1/grafts/constants`, but the backend registers the endpoint only at `/api/grafts/constants`, inside the Sanctum-authenticated marketplace group (`routes/api.php:364`); the Public API v1 group (`routes/api.php:900-907`) exposes validate, push and assets only. The lookup therefore cannot succeed, and `resolveCategorySlugs` swallows the failure (`constantsClient.ts:145-157`), so the CLI silently falls back to `KNOWN_CATEGORY_SLUGS` and never uses the live whitelist.
+The CLI requests `/api/v1/grafts/constants`, but the backend registers the endpoint only at `/api/grafts/constants`, inside the Sanctum-authenticated marketplace group (`routes/api.php:367`); the Public API v1 group (`routes/api.php:893-900`) exposes validate, push and assets only. The lookup therefore cannot succeed, and `resolveCategorySlugs` swallows the failure (`constantsClient.ts:145-157`), so the CLI silently falls back to `KNOWN_CATEGORY_SLUGS` and never uses the live whitelist.
 
 Fix: point the client at a route that exists — either add the constants endpoint to the master-key v1 group or call `/api/grafts/constants` with the right auth — and surface a warning when the live list is unavailable instead of falling back silently.
 
@@ -47,7 +47,7 @@ Fix: point the client at a route that exists — either add the constants endpoi
 
 ### 6. No CI despite the documented gate
 
-**Files**: no `.github/` directory; `package.json:27-33` (scripts); `AGENTS.md:110-113` ("Done means")
+**Files**: no `.github/` directory; `package.json:27-33` (scripts); `AGENTS.md:109-112` ("Done means")
 
 **Severity**: Low
 
@@ -93,7 +93,7 @@ Fix: validate the envelope shape (`metadata`/`schema` objects, `harness_constrai
 
 **Severity**: Low
 
-`TOOLS.md` and `install.sh` are copied with bare `catch {}` blocks (`sidecars.ts:207,220`). A permission or I/O failure is reported as "absent" instead of surfacing, so a scaffold can silently omit a file the author expected to ship.
+`TOOLS.md` and `install.sh` are copied with bare `catch {}` blocks (`sidecars.ts:206,219`). A permission or I/O failure is reported as "absent" instead of surfacing, so a scaffold can silently omit a file the author expected to ship.
 
 Fix: only treat `ENOENT` as absent; rethrow (or warn) on other errors.
 
@@ -107,3 +107,34 @@ The scaffold README renders "This calls `POST /api/grafts` with your master API 
 
 Fix: render the actual v1 path (or derive it from `API_BASE_URL`).
 
+## Newly identified (2026-11-12)
+
+### 12. The generated bundle README documents `install.sh` as a live first-boot hook
+
+**Files**: `src/graft/bundle.ts:12,25-26,126-133,323,422` (comments and generated README), `openclaw-launcher/src/openclaw/graft-apply.ts` (no `install.sh` handling), `gene-seed/internal/grafts/marketplace.md:119-124`
+
+**Severity**: High
+
+`src/graft/bundle.ts` still tells authors that `install.sh` "runs once on first apply" for binary setup, and the emitted bundle README repeats the claim (`bundle.ts:323,422`). The launcher never executes it: `graft-apply.ts` has no `install.sh` handling, and the marketplace doc states legacy bundles may carry it but it is ignored. Binary/runtime setup is no longer a GRAFT hook — apt packages replay from `.deps/apt-packages.txt` and the agent runs as the non-root runtime user. The top-level `README.md` was corrected in this pass; the generated template (code) is still wrong.
+
+Fix: remove the first-boot-hook claims and the `install.sh` entry from the generated bundle README, replacing them with the legacy/ignored note.
+
+### 13. The generated bundle README documents `type: command` materializers the launcher drops
+
+**Files**: `src/graft/bundle.ts:408-424` (generated example uses `"type": "command"`), `openclaw-launcher/src/openclaw/graft-apply.ts:349-398,422-429` (only `type: "file"` specs are kept; non-file specs are logged and ignored)
+
+**Severity**: Medium
+
+The generated bundle README teaches authors to write a `type: command` materializer (and says the launcher re-runs it on `reload-config`). The launcher persists only file specs: `isFileMaterializeSpec()` rejects everything whose `type` is not `"file"`, and command materializers were removed. Authors following the generated README ship a secret field the launcher silently ignores.
+
+Fix: replace the generated example with a `type: "file"` spec, or remove the `materialize` section until command materializers return.
+
+### 14. The generated bundle README documents legacy managed markers
+
+**Files**: `src/graft/bundle.ts:436-437` (`<!-- BEGIN MANAGED:graft:tools -->` / `<!-- END MANAGED:graft:tools -->`), `gene-seed/internal/grafts/marketplace.md:221` (current syntax is `<!-- @guayaba:slot graft:tools -->` / `<!-- @guayaba:end graft:tools -->`)
+
+**Severity**: Low
+
+The generated bundle README tells authors the launcher injects `TOOLS.md` using the legacy `<!-- BEGIN/END MANAGED:... -->` delimiters. The current launcher writes the `<!-- @guayaba:slot graft:tools -->` block and migrates legacy markers silently, so authors who copy the documented syntax are documenting the wrong format.
+
+Fix: render the current `@guayaba:slot` syntax in the generated README.
