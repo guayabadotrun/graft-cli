@@ -1,5 +1,9 @@
 # AGENTS.md — graft-cli
 
+> **RETIRED — see ADR-054.** GRAFT and this CLI were retired on 2026-11-15. The
+> backend GRAFT routes return 404, so every published version is incompatible
+> with the current Guayaba API. This repository is archived for reference.
+
 ## Quick Reference
 
 **Stack:** Node.js / TypeScript, ESM + CJS dual build, `tsup` — binary: `dist/cli.js` (`graft`)
